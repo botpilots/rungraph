@@ -44,7 +44,7 @@ export class GoalGraphRenderer {
 	// Canvas and layout properties
 	private canvasWidth = 800;
 	private canvasHeight = 500;
-	private padding = { top: 50, right: 80, bottom: 120, left: 40 }; // Increased right padding from 40 to 70
+	private padding = { top: 50, right: 80, bottom: 120, left: 10 }; // Restored right padding
 	private graphWidth = 0; // Visible graph area width
 	private graphHeight = 0; // Visible graph area height
 
@@ -58,6 +58,10 @@ export class GoalGraphRenderer {
 	private yMin = 0;
 	private yMax = 1;
 	private maxDuration = 1;
+
+	// Content boundaries based on data
+	private contentMinX = 0;
+	private contentMaxX = 0;
 
 	// Interaction state
 	private sliderX: number | null = null; // Slider position relative to visible canvas
@@ -125,8 +129,8 @@ export class GoalGraphRenderer {
 		this.canvasWidth = Math.max(50, this.parentElement.clientWidth); // Removed max 800 limit and fallback
 		this.canvasHeight = Math.max(50, this.parentElement.clientHeight); // Removed fallback
 
-		// Recalculate graph drawing area
-		this.graphWidth = Math.max(1, this.canvasWidth - this.padding.left - this.padding.right);
+		// Recalculate graph drawing area - Use only left padding for visual width
+		this.graphWidth = Math.max(1, this.canvasWidth - this.padding.left); // Right padding is only for label clipping
 		this.graphHeight = Math.max(1, this.canvasHeight - this.padding.top - this.padding.bottom);
 		this.sliderTrackY = this.canvasHeight - this.padding.bottom;
 
@@ -175,8 +179,24 @@ export class GoalGraphRenderer {
 	}
 
 	private constrainViewOffset(): void {
-		const maxOffsetX = Math.max(0, this.totalGraphContentWidth - this.graphWidth);
-		this.viewOffsetX = Math.max(0, Math.min(this.viewOffsetX, maxOffsetX));
+		// Calculate maximum offset based on content width and padding
+		const maxOffsetX = Math.max(0, this.contentMaxX - (this.canvasWidth - this.padding.right));
+		// Calculate minimum offset based on content start and padding
+		const minOffsetX = Math.max(0, this.contentMinX - this.padding.left);
+		// Calculate the currently needed total width within the view
+		const visibleContentWidth = this.contentMaxX - this.contentMinX;
+
+		let targetOffsetX = this.viewOffsetX;
+
+		// If the total content is narrower than the available graph area, center it.
+		if (visibleContentWidth < this.graphWidth) {
+			targetOffsetX = this.contentMinX - this.padding.left - (this.graphWidth - visibleContentWidth) / 2;
+		} else {
+			// Otherwise, constrain within calculated min/max
+			targetOffsetX = Math.max(minOffsetX, Math.min(targetOffsetX, maxOffsetX));
+		}
+
+		this.viewOffsetX = Math.max(0, targetOffsetX); // Ensure offset is never negative
 	}
 
 	// --- Data Processing ---
@@ -296,6 +316,16 @@ export class GoalGraphRenderer {
 		});
 
 		this.constrainViewOffset(); // Ensure offset is valid after data processing
+
+		// Calculate actual content horizontal boundaries after processing all points
+		if (this.points.length > 0) {
+			this.contentMinX = this.points.reduce((min, p) => Math.min(min, p.originalX), this.points[0].originalX);
+			this.contentMaxX = this.points.reduce((max, p) => Math.max(max, p.originalX), this.points[0].originalX);
+		} else {
+			// Default if no points
+			this.contentMinX = this.padding.left;
+			this.contentMaxX = this.canvasWidth - this.padding.right;
+		}
 	}
 
 	// --- p5 Drawing Logic ---
@@ -363,7 +393,17 @@ export class GoalGraphRenderer {
 			p.stroke(200); p.strokeWeight(1); p.line(drawX, axisY, drawX, axisY + 5); // Tick
 		});
 
-		p.stroke(150); p.strokeWeight(1); p.line(visibleLeft, axisY, visibleRight, axisY); // Axis line
+		// Draw axis line between the visible extent of the *content*, clamped by left padding visually
+		const lineStartX = Math.max(this.padding.left, this.contentMinX - this.viewOffsetX);
+		// Line should visually extend to canvas edge (minus left padding), unless content ends sooner
+		const visualAxisEndX = this.canvasWidth - this.padding.left;
+		const contentEndXOnScreen = Math.max(lineStartX, this.contentMaxX - this.viewOffsetX);
+		const lineEndX = Math.min(visualAxisEndX, contentEndXOnScreen);
+
+		p.stroke(150); p.strokeWeight(1);
+		if (lineEndX > lineStartX) { // Only draw if there's a visible line segment
+			p.line(lineStartX, axisY, lineEndX, axisY);
+		}
 	}
 
 	private drawWorkoutColumns(visibleLeft: number, visibleRight: number, buffer: number): void {
@@ -519,15 +559,28 @@ export class GoalGraphRenderer {
 			}
 		});
 
-		// If no points are visible, use default bounds
-		if (minY === this.canvasHeight || maxY === this.padding.top) {
+		// If no points or columns are visible, use default vertical bounds
+		if (minY === this.canvasHeight && maxY === this.padding.top) {
 			minY = this.padding.top;
 			maxY = this.canvasHeight - this.padding.bottom;
+		} else {
+			// Add small buffer to min/max Y if points/columns were found
+			minY = Math.max(this.padding.top, minY - 10);
+			maxY = Math.min(this.canvasHeight - this.padding.bottom, maxY + 10);
 		}
 
-		// Draw the vertical indicator line between min and max Y
+		// Calculate the visible screen X coordinates of the content boundaries
+		const visibleContentStartX = Math.max(this.padding.left, this.contentMinX - this.viewOffsetX);
+		const visibleContentEndX = Math.min(this.canvasWidth - this.padding.right, this.contentMaxX - this.viewOffsetX);
+
+		// Clamp the slider's visual X position to the visible content boundaries *for drawing the line only*
+		const indicatorDrawX = p.constrain(this.sliderX, visibleContentStartX, visibleContentEndX);
+
+		// Draw the vertical indicator line between min and max Y at the clamped X position
 		p.stroke(120, 120, 120, 180); p.strokeWeight(1); p.drawingContext.setLineDash([4, 4]);
-		p.line(this.sliderX, minY, this.sliderX, maxY);
+		if (maxY > minY) { // Only draw if there's a valid vertical span
+			p.line(indicatorDrawX, minY, indicatorDrawX, maxY);
+		}
 		p.drawingContext.setLineDash([]);
 	}
 
@@ -694,8 +747,9 @@ export class GoalGraphRenderer {
 
 		// Check for Graph Pan Start 
 		if (!this.isDraggingSlider && this.totalGraphContentWidth > this.graphWidth) {
+			// Allow panning if touch is within the visual graph area (left padding to canvas edge minus left padding)
 			const isInsidePanArea = touchPos.y > this.padding.top && touchPos.y < this.canvasHeight - this.padding.bottom &&
-				touchPos.x > this.padding.left && touchPos.x < this.canvasWidth - this.padding.right;
+				touchPos.x > this.padding.left && touchPos.x < this.canvasWidth - this.padding.left;
 
 			if (isInsidePanArea) {
 				this.isDraggingGraph = true;
@@ -723,16 +777,25 @@ export class GoalGraphRenderer {
 
 		// Handle Slider Drag
 		if (this.isDraggingSlider && this.sliderX !== null) {
-			const newSliderX = this.p.constrain(touchPos.x, this.padding.left, this.canvasWidth - this.padding.right);
+			// Calculate visible content boundaries for clamping
+			const visibleContentStartX = Math.max(this.padding.left, this.contentMinX - this.viewOffsetX);
+			const visibleContentEndX = Math.max(visibleContentStartX, this.contentMaxX - this.viewOffsetX); // Ensure end >= start
+			// Visual max slider position is near canvas edge (respecting left padding)
+			const visualSliderMaxX = this.canvasWidth - this.padding.left;
+			// Actual max is limited by the visual max OR the content end, whichever is smaller
+			const actualSliderMaxX = Math.min(visualSliderMaxX, visibleContentEndX);
+
+			// Clamp slider position
+			const newSliderX = this.p.constrain(touchPos.x, visibleContentStartX, actualSliderMaxX);
 			this.sliderX = newSliderX;
 		}
-		// Handle Graph Pan 
+		// Handle Graph Pan
 		else if (this.isDraggingGraph) {
 			const dx = touchPos.x - this.dragStartX;
 			const newOffsetX = this.dragStartOffsetX - dx;
-			const maxOffsetX = Math.max(0, this.totalGraphContentWidth - this.graphWidth);
-			const constrainedOffsetX = this.p.constrain(newOffsetX, 0, maxOffsetX);
-			this.viewOffsetX = constrainedOffsetX;
+			// Constraining offset is handled by constrainViewOffset, just update it here
+			this.viewOffsetX = newOffsetX;
+			this.constrainViewOffset(); // Apply constraints immediately during drag
 		}
 	}
 
@@ -766,8 +829,9 @@ export class GoalGraphRenderer {
 		}
 		// Graph Panning Check (if not dragging slider and content is scrollable)
 		else if (this.totalGraphContentWidth > this.graphWidth &&
+			// Allow panning if mouse is within the visual graph area (left padding to canvas edge minus left padding)
 			p.mouseY > this.padding.top && p.mouseY < this.canvasHeight - this.padding.bottom &&
-			p.mouseX > this.padding.left && p.mouseX < this.canvasWidth - this.padding.right) {
+			p.mouseX > this.padding.left && p.mouseX < this.canvasWidth - this.padding.left) {
 			this.isDraggingGraph = true;
 			this.isDraggingSlider = false;
 			this.dragStartX = p.mouseX;
@@ -779,12 +843,23 @@ export class GoalGraphRenderer {
 	private handleMouseDragged(): void {
 		const p = this.p;
 		if (this.isDraggingSlider && this.sliderX !== null) {
-			this.sliderX = p.constrain(p.mouseX, this.padding.left, this.canvasWidth - this.padding.right);
+			// Calculate visible content boundaries for clamping
+			const visibleContentStartX = Math.max(this.padding.left, this.contentMinX - this.viewOffsetX);
+			const visibleContentEndX = Math.max(visibleContentStartX, this.contentMaxX - this.viewOffsetX); // Ensure end >= start
+			// Visual max slider position is near canvas edge (respecting left padding)
+			const visualSliderMaxX = this.canvasWidth - this.padding.left;
+			// Actual max is limited by the visual max OR the content end, whichever is smaller
+			const actualSliderMaxX = Math.min(visualSliderMaxX, visibleContentEndX);
+
+			// Clamp slider position
+			this.sliderX = p.constrain(p.mouseX, visibleContentStartX, actualSliderMaxX);
 		}
 		else if (this.isDraggingGraph) {
 			const dx = p.mouseX - this.dragStartX;
 			const newOffsetX = this.dragStartOffsetX - dx;
-			this.viewOffsetX = p.constrain(newOffsetX, 0, Math.max(0, this.totalGraphContentWidth - this.graphWidth));
+			// Constraining offset is handled by constrainViewOffset, just update it here
+			this.viewOffsetX = newOffsetX;
+			this.constrainViewOffset(); // Apply constraints immediately during drag
 			p.cursor('grabbing');
 		}
 	}
