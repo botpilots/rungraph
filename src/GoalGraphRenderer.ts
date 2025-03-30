@@ -617,10 +617,27 @@ export class GoalGraphRenderer {
 		p.mousePressed = this.handleMousePressed.bind(this);
 		p.mouseDragged = this.handleMouseDragged.bind(this);
 		p.mouseReleased = this.handleMouseReleased.bind(this);
+
+		// --- Add direct touch event listeners for mobile devices ---
+		// NOTE on Touch Coordinates: Touch events (like TouchEvent.touches[0].clientX/Y)
+		// provide coordinates relative to the browser viewport. These must be converted
+		// to the logical coordinate system used by p5.js for drawing and interaction
+		// (based on this.canvasWidth/this.canvasHeight), NOT the raw drawing buffer
+		// dimensions (canvas.width/canvas.height), especially on high-DPI displays
+		// where these can differ significantly. The getTouchPosition helper handles this.
+		const canvasElement = p.drawingContext.canvas;
+		if (canvasElement) {
+			canvasElement.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
+			canvasElement.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
+			canvasElement.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false });
+			canvasElement.addEventListener('touchcancel', this.handleTouchEnd.bind(this), { passive: false });
+		} else {
+			console.warn('Could not get canvas element to attach touch listeners.');
+		}
 		// Prevent page scroll when mouse wheel is used over the graph container
 		this.parentElement?.addEventListener('wheel', (e) => {
 			// Check if the event target is the canvas or inside the graph container
-			if (e.target === (p as any).canvas || this.parentElement?.contains(e.target as Node)) {
+			if (e.target === canvasElement || this.parentElement?.contains(e.target as Node)) {
 				// Check roughly if mouse is within graph area (excluding padding maybe?)
 				if (p.mouseX > this.padding.left && p.mouseX < this.canvasWidth - this.padding.right &&
 					p.mouseY > this.padding.top && p.mouseY < this.canvasHeight - this.padding.bottom) {
@@ -628,6 +645,106 @@ export class GoalGraphRenderer {
 				}
 			}
 		}, { passive: false });
+	}
+
+	// --- Helper to get canvas-relative touch position ---
+	private getTouchPosition(touch: Touch): { x: number, y: number } | null {
+		const canvas = this.p.drawingContext.canvas as HTMLCanvasElement | null;
+		if (!canvas) {
+			console.error("getTouchPosition: Canvas element not found!"); // Keep error for actual issues
+			return null;
+		}
+		const rect = canvas.getBoundingClientRect();
+
+		// Corrected Calculation: Map viewport coords to logical canvas coords
+		const relativeX = touch.clientX - rect.left;
+		const relativeY = touch.clientY - rect.top;
+		const logicalX = (relativeX / rect.width) * this.canvasWidth;
+		const logicalY = (relativeY / rect.height) * this.canvasHeight;
+
+		return { x: logicalX, y: logicalY };
+	}
+
+	// --- Touch Event Handlers (Direct) ---
+	private handleTouchStart(event: TouchEvent): void {
+		if (!event.touches || event.touches.length === 0) return;
+
+		const touch = event.touches[0];
+		const touchPos = this.getTouchPosition(touch);
+		if (!touchPos) return;
+
+		let shouldPreventDefault = false;
+
+		// Check for Slider Drag Start 
+		if (this.sliderX !== null) {
+			const sliderKnobY = this.sliderTrackY - this.knobHeight / 2;
+			const touchPadding = 25;
+			const knobLeft = this.sliderX - (this.knobWidth / 2) - touchPadding;
+			const knobRight = this.sliderX + (this.knobWidth / 2) + touchPadding;
+			const knobTop = sliderKnobY - touchPadding;
+			const knobBottom = sliderKnobY + this.knobHeight + touchPadding;
+
+			if (touchPos.x >= knobLeft && touchPos.x <= knobRight &&
+				touchPos.y >= knobTop && touchPos.y <= knobBottom) {
+				this.isDraggingSlider = true;
+				this.isDraggingGraph = false;
+				shouldPreventDefault = true;
+			}
+		}
+
+		// Check for Graph Pan Start 
+		if (!this.isDraggingSlider && this.totalGraphContentWidth > this.graphWidth) {
+			const isInsidePanArea = touchPos.y > this.padding.top && touchPos.y < this.canvasHeight - this.padding.bottom &&
+				touchPos.x > this.padding.left && touchPos.x < this.canvasWidth - this.padding.right;
+
+			if (isInsidePanArea) {
+				this.isDraggingGraph = true;
+				this.isDraggingSlider = false;
+				this.dragStartX = touchPos.x;
+				this.dragStartOffsetX = this.viewOffsetX;
+				shouldPreventDefault = true;
+			}
+		}
+
+		if (shouldPreventDefault) {
+			event.preventDefault();
+		}
+	}
+
+	private handleTouchMove(event: TouchEvent): void {
+		if (!event.touches || event.touches.length === 0) return;
+		if (!this.isDraggingSlider && !this.isDraggingGraph) return;
+
+		const touch = event.touches[0];
+		const touchPos = this.getTouchPosition(touch);
+		if (!touchPos) return;
+
+		event.preventDefault();
+
+		// Handle Slider Drag
+		if (this.isDraggingSlider && this.sliderX !== null) {
+			const newSliderX = this.p.constrain(touchPos.x, this.padding.left, this.canvasWidth - this.padding.right);
+			this.sliderX = newSliderX;
+		}
+		// Handle Graph Pan 
+		else if (this.isDraggingGraph) {
+			const dx = touchPos.x - this.dragStartX;
+			const newOffsetX = this.dragStartOffsetX - dx;
+			const maxOffsetX = Math.max(0, this.totalGraphContentWidth - this.graphWidth);
+			const constrainedOffsetX = this.p.constrain(newOffsetX, 0, maxOffsetX);
+			this.viewOffsetX = constrainedOffsetX;
+		}
+	}
+
+	private handleTouchEnd(event: TouchEvent): void {
+		if (event.touches.length === 0) {
+			if (this.isDraggingSlider) {
+				this.isDraggingSlider = false;
+			}
+			if (this.isDraggingGraph) {
+				this.isDraggingGraph = false;
+			}
+		}
 	}
 
 	// --- Mouse Event Handlers (Panning and Slider) ---
