@@ -209,6 +209,8 @@ export class GoalGraphRenderer {
 		// Calculate width of a single day in pixels
 		const millisecondsPerDay = 24 * 60 * 60 * 1000;
 		const dayWidth = (millisecondsPerDay / fullTimeSpan) * this.totalGraphContentWidth;
+		// Half day in milliseconds for centering points
+		const halfDayInMillis = millisecondsPerDay / 2;
 
 		// --- Add points/columns, calculate originalX relative to total width ---
 		const mapTimeToX = (date: Date): number => {
@@ -216,16 +218,23 @@ export class GoalGraphRenderer {
 			return this.padding.left + timeRatioInFullSpan * this.totalGraphContentWidth;
 		};
 
+		// Map time to X with point centered in day
+		const mapPointTimeToX = (date: Date): number => {
+			// Create a new date with time shifted to middle of the day
+			const centeredDate = new Date(date.getTime() + halfDayInMillis);
+			return mapTimeToX(centeredDate);
+		};
+
 		const startTimeSeconds = parseTimeToSeconds(this.startData.currentRaceTime);
 		this.points.push({
-			originalX: mapTimeToX(startDate),
+			originalX: mapPointTimeToX(startDate),
 			currentX: 0, y: 0, date: startDate, timeSeconds: startTimeSeconds,
 			displayTime: formatSecondsToTime(startTimeSeconds), type: 'start',
 		});
 
 		const goalTimeSeconds = parseTimeToSeconds(this.goalData.targetRaceTime);
 		this.points.push({
-			originalX: mapTimeToX(goalDate),
+			originalX: mapPointTimeToX(goalDate),
 			currentX: 0, y: 0, date: goalDate, timeSeconds: goalTimeSeconds,
 			displayTime: this.goalData.targetRaceTime, type: 'goal',
 		});
@@ -240,7 +249,7 @@ export class GoalGraphRenderer {
 
 			if (isTrial && isValidTime) {
 				this.points.push({
-					originalX: activityOriginalX,
+					originalX: mapPointTimeToX(activityDate),
 					currentX: 0, y: 0, date: activityDate, timeSeconds: activity.moving_time,
 					displayTime: formatSecondsToTime(activity.moving_time), type: 'trial',
 					activity: activity,
@@ -458,10 +467,18 @@ export class GoalGraphRenderer {
 			p.ellipse(drawX, point.y, this.pointSize, this.pointSize);
 			p.pop();
 
-			// Draw label if point is roughly visible
-			if (drawX >= visibleLeft && drawX <= visibleRight) {
+			// Draw label if point is roughly visible (use a wider visibility check)
+			if (drawX >= visibleLeft - buffer / 2 && drawX <= visibleRight + buffer / 2) {
 				p.noStroke(); p.fill(pointColor); p.textSize(this.pointLabelFontSize);
-				const timeLabel = point.displayTime.match(/^(\\d{2}:\\d{2}:\\d{2})/)?.[1] || point.displayTime;
+				// Fix the regex pattern and ensure we always have a valid label
+				let timeLabel = point.displayTime;
+				// Only try to parse/format if it's not the goal (which might have a different format)
+				if (point.type !== 'goal') {
+					const match = point.displayTime.match(/^(\d{2}:\d{2}:\d{2})/);
+					if (match && match[1]) {
+						timeLabel = match[1];
+					}
+				}
 
 				// Always position text above the point
 				p.textAlign(p.CENTER, p.BOTTOM);
