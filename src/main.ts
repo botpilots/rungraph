@@ -3,9 +3,10 @@ import p5 from 'p5'
 import { GoalGraphRenderer } from './GoalGraphRenderer'
 import { generateSampleData } from './utils'
 
-// Clear out any existing content and add a container for the graph
+// Clear out any existing content and add a container for the graph and info box
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div id="graph-container"></div>
+  <div id="info-box"></div>
 `
 
 // Generate the sample data based on the image

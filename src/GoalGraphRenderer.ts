@@ -42,7 +42,7 @@ export class GoalGraphRenderer {
 	// Canvas and layout properties
 	private canvasWidth = 800;
 	private canvasHeight = 500;
-	private padding = { top: 50, right: 180, bottom: 120, left: 40 };
+	private padding = { top: 50, right: 20, bottom: 120, left: 20 };
 	private graphWidth = this.canvasWidth - this.padding.left - this.padding.right;
 	private graphHeight = this.canvasHeight - this.padding.top - this.padding.bottom;
 
@@ -63,6 +63,8 @@ export class GoalGraphRenderer {
 	private readonly knobHeight = this.pointSize * 1.2;
 	private sliderTrackY = this.canvasHeight - this.padding.bottom;
 
+	// Reference to the HTML element for the info box
+	private infoBoxElement: HTMLElement | null = null;
 
 	constructor(
 		p: p5,
@@ -78,7 +80,9 @@ export class GoalGraphRenderer {
 		this.trialDay = trialDay.toLowerCase();
 
 		// Initialize dimensions based on p5 instance if available
-		this.canvasWidth = Math.min(this.p.windowWidth * 0.9, 800);
+		this.canvasWidth = Math.min(this.p.windowWidth - 20, 800);
+		this.graphWidth = this.canvasWidth - this.padding.left - this.padding.right;
+		this.graphHeight = this.canvasHeight - this.padding.top - this.padding.bottom;
 		this.sliderTrackY = this.canvasHeight - this.padding.bottom;
 
 		this.processData();
@@ -412,19 +416,27 @@ export class GoalGraphRenderer {
 	}
 
 	private drawInfoBox(): void {
+		// Get the info box element from the DOM if we haven't already
+		if (!this.infoBoxElement) {
+			this.infoBoxElement = document.getElementById('info-box');
+		}
+		// If the element doesn't exist in the DOM, we can't proceed
+		if (!this.infoBoxElement) {
+			console.error('Info box element #info-box not found!');
+			return;
+		}
+
 		const p = this.p;
 		let infoText: string[] = [];
-		const infoBoxX = this.canvasWidth - this.padding.right + 15;
-		const infoBoxY = this.padding.top;
-		const infoBoxWidth = this.padding.right - 30; // Use available space in right padding
-		const lineHeight = 14; // Adjusted line height
-		const textPadding = 10; // Padding inside the box
+		// Keep lineHeight and textPadding for generating content logic if needed, but remove drawing coords
+		// const lineHeight = 14;
+		// const textPadding = 10;
+		// REMOVED: infoBoxX, infoBoxY, infoBoxWidth calculations
 
-		p.textFont('Arial'); // Ensure consistent font
-
+		// Keep the logic to populate infoText based on hoveredPoint/hoveredColumn
 		if (this.hoveredPoint) {
 			// Display Point Info (Trial/Start/Goal)
-			infoText.push(`${this.hoveredPoint.type.charAt(0).toUpperCase() + this.hoveredPoint.type.slice(1)} Point`);
+			infoText.push(`<strong>${this.hoveredPoint.type.charAt(0).toUpperCase() + this.hoveredPoint.type.slice(1)} Point</strong>`);
 			infoText.push(`Date: ${this.hoveredPoint.date.toLocaleDateString('en-CA')}`); // YYYY-MM-DD
 			infoText.push(`Time: ${this.hoveredPoint.displayTime}`); // Display full time string including " HM" if present
 
@@ -443,8 +455,8 @@ export class GoalGraphRenderer {
 
 			// Add Week Summary for Trial points
 			if (this.hoveredPoint.type === 'trial' && this.hoveredPoint.activity) {
-				infoText.push(''); // Separator
-				infoText.push('Week Summary:');
+				infoText.push(''); // Separator line (will become <hr> or empty <p>)
+				infoText.push('<strong>Week Summary:</strong>');
 				const weekStart = getStartOfWeek(this.hoveredPoint.date);
 				const weekEnd = new Date(weekStart);
 				weekEnd.setDate(weekStart.getDate() + 7); // Week ends *before* the next Monday
@@ -463,15 +475,15 @@ export class GoalGraphRenderer {
 					}
 				});
 
-				infoText.push(`  Activities: ${weekActivityCount}`);
-				infoText.push(`  Distance: ${(weeklyDistance / 1000).toFixed(1)} km`);
-				infoText.push(`  Duration: ${formatSecondsToTime(weeklyTime)}`);
+				infoText.push(`Activities: ${weekActivityCount}`);
+				infoText.push(`Distance: ${(weeklyDistance / 1000).toFixed(1)} km`);
+				infoText.push(`Duration: ${formatSecondsToTime(weeklyTime)}`);
 			}
 
 		} else if (this.hoveredColumn) {
 			// Display Workout Column Info
 			const activity = this.hoveredColumn.activity;
-			infoText.push(`Workout: ${activity.name}`);
+			infoText.push(`<strong>Workout: ${activity.name}</strong>`);
 			infoText.push(`Date: ${new Date(activity.start_date_local).toLocaleDateString('en-CA')}`); // YYYY-MM-DD format
 			infoText.push(`Dist: ${(activity.distance / 1000).toFixed(2)} km`);
 			infoText.push(`Time: ${formatSecondsToTime(activity.moving_time)}`);
@@ -494,28 +506,35 @@ export class GoalGraphRenderer {
 				infoText.push(`Suffer Score: ${activity.suffer_score}`);
 			}
 
+		}
+
+		// --- Update the HTML info box element --- 
+		if (infoText.length > 0) {
+			// Simple HTML escaping and formatting
+			const infoHTML = infoText.map(line =>
+				line === ''
+					? '<hr style="border: none; border-top: 1px solid #ddd; margin: 4px 0;">'
+					: `<p style="margin: 0; padding: 1px 0;">${line.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
+			).join('');
+			this.infoBoxElement.innerHTML = infoHTML;
+			this.infoBoxElement.style.display = 'block'; // Show the box
 		} else {
-			// Default text when nothing is hovered by the slider
-			infoText.push("Move slider over");
-			infoText.push("points or bars");
-			infoText.push("to see details.");
+			// If no point/column is hovered, hide the box
+			this.infoBoxElement.innerHTML = ''; // Clear content
+			this.infoBoxElement.style.display = 'none'; // Hide the box
 		}
 
-		// --- Draw the info box background ---
-		const infoBoxHeight = Math.max(50, infoText.length * lineHeight + textPadding * 2); // Ensure minimum height
-		p.fill(248, 248, 248, 235); // Light grey, slightly more opaque background
-		p.noStroke();
-		// Use textPadding for internal spacing
-		p.rect(infoBoxX - textPadding, infoBoxY - textPadding, infoBoxWidth + textPadding * 2, infoBoxHeight, 5); // Rounded corners
-
-		// --- Draw the text lines ---
-		p.fill(20); // Dark text color for contrast
-		p.textSize(11); // Standard info text size
-		p.textAlign(p.LEFT, p.TOP);
-		for (let i = 0; i < infoText.length; i++) {
-			// Position text inside the padded box
-			p.text(infoText[i], infoBoxX, infoBoxY + i * lineHeight);
-		}
+		// REMOVE p5 drawing code for the info box background and text
+		// const infoBoxHeight = Math.max(30 + textPadding * 2, infoText.length * lineHeight + textPadding * 2); // Adjusted min height
+		// p.fill(248, 248, 248, 235); 
+		// p.noStroke();
+		// p.rect(this.padding.left, infoBoxY - textPadding, infoBoxWidth + textPadding * 2, infoBoxHeight, 5);
+		// p.fill(20);
+		// p.textSize(11); 
+		// p.textAlign(p.LEFT, p.TOP);
+		// for (let i = 0; i < infoText.length; i++) {
+		// 	p.text(infoText[i], infoBoxX, infoBoxY + i * lineHeight);
+		// }
 	}
 
 
@@ -573,7 +592,8 @@ export class GoalGraphRenderer {
 	// --- Handle Window Resizing ---
 	public windowResized(): void {
 		const p = this.p;
-		this.canvasWidth = Math.min(p.windowWidth * 0.9, 800);
+		// Use windowWidth - small margin, capped at 800
+		this.canvasWidth = Math.min(p.windowWidth - 20, 800);
 		// Keep height fixed or make it responsive too? Let's keep it fixed for now.
 		// this.canvasHeight = 500;
 		p.resizeCanvas(this.canvasWidth, this.canvasHeight);
