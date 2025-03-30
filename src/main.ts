@@ -7,6 +7,14 @@ import { generateSampleData } from './utils'
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div id="info-box"></div>
   <div id="graph-container"></div>
+  <div class="view-toggle-container">
+    <span>3 Weeks</span>
+    <label class="switch">
+      <input type="checkbox" id="view-toggle-checkbox" checked>
+      <span class="slider round"></span>
+    </label>
+    <span>Full</span>
+  </div>
 `
 
 // Generate the sample data based on the image
