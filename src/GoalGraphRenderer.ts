@@ -206,6 +206,10 @@ export class GoalGraphRenderer {
 			this.totalGraphContentWidth = this.graphWidth;
 		}
 
+		// Calculate width of a single day in pixels
+		const millisecondsPerDay = 24 * 60 * 60 * 1000;
+		const dayWidth = (millisecondsPerDay / fullTimeSpan) * this.totalGraphContentWidth;
+
 		// --- Add points/columns, calculate originalX relative to total width ---
 		const mapTimeToX = (date: Date): number => {
 			const timeRatioInFullSpan = fullTimeSpan > 0 ? (date.getTime() - startDate.getTime()) / fullTimeSpan : 0;
@@ -242,10 +246,10 @@ export class GoalGraphRenderer {
 					activity: activity,
 				});
 			} else if (isValidTime) {
-				const columnWidth = 5;
+				// Set column width to represent a full day
 				this.workoutColumns.push({
-					originalX: activityOriginalX - columnWidth / 2, // Store left edge X
-					currentX: 0, y: 0, width: columnWidth, height: 0,
+					originalX: activityOriginalX - (dayWidth / 2), // Center the column on the activity date
+					currentX: 0, y: 0, width: dayWidth, height: 0,
 					activity: activity, date: activityDate,
 				});
 			}
@@ -351,7 +355,11 @@ export class GoalGraphRenderer {
 	private drawWorkoutColumns(visibleLeft: number, visibleRight: number, buffer: number): void {
 		const p = this.p;
 		p.strokeWeight(0.8);
-		this.workoutColumns.forEach(col => {
+
+		// Sort columns by date for drawing in order
+		const sortedColumns = [...this.workoutColumns].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+		sortedColumns.forEach((col, index) => {
 			const drawX = col.currentX;
 			if (drawX + col.width < visibleLeft - buffer || drawX > visibleRight + buffer) return; // Clipping
 
@@ -362,7 +370,20 @@ export class GoalGraphRenderer {
 
 			p.fill(isHoveredBySlider ? hoverColor : baseColor);
 			p.stroke(isHoveredBySlider ? p.color(60, 100, 180) : p.color(100, 150, 200));
-			p.rect(drawX, col.y, col.width, col.height, 1);
+
+			// Determine if this column should connect with the next one (consecutive days)
+			let drawWidth = col.width;
+			if (index < sortedColumns.length - 1) {
+				const nextCol = sortedColumns[index + 1];
+				const dayDifference = Math.round((nextCol.date.getTime() - col.date.getTime()) / (24 * 60 * 60 * 1000));
+
+				// If columns are consecutive days, extend this column to touch the next one
+				if (dayDifference === 1) {
+					drawWidth = nextCol.currentX - col.currentX;
+				}
+			}
+
+			p.rect(drawX, col.y, drawWidth, col.height, 1);
 
 			// Only update hover state if we're not dragging the graph
 			if (isHoveredBySlider && !this.isDraggingGraph) {
