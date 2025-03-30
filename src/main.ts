@@ -31,6 +31,12 @@ const sketch = (p: p5) => {
 
 		// Instantiate the renderer class, passing the p5 instance, data, and parent container ID
 		renderer = new GoalGraphRenderer(p, start, goal, activities, 'graph-container', 'sunday')
+
+		// Explicitly call windowResized once after instantiation to ensure correct initial size
+		// This helps avoid timing issues where the container size might not be ready during the constructor.
+		if (renderer) {
+			renderer.windowResized();
+		}
 	}
 
 	p.draw = () => {

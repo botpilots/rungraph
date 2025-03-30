@@ -121,9 +121,9 @@ export class GoalGraphRenderer {
 		const oldGraphWidth = this.graphWidth;
 		const oldPaddingLeft = this.padding.left;
 
-		// Update canvas dimensions
-		this.canvasWidth = Math.max(50, Math.min(this.parentElement.clientWidth || p.windowWidth - 20, 800));
-		this.canvasHeight = Math.max(50, this.parentElement.clientHeight || 300);
+		// Update canvas dimensions based *directly* on parent container size
+		this.canvasWidth = Math.max(50, this.parentElement.clientWidth); // Removed max 800 limit and fallback
+		this.canvasHeight = Math.max(50, this.parentElement.clientHeight); // Removed fallback
 
 		// Recalculate graph drawing area
 		this.graphWidth = Math.max(1, this.canvasWidth - this.padding.left - this.padding.right);
