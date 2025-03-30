@@ -281,12 +281,17 @@ export class GoalGraphRenderer {
 
 		// --- Map Y Coordinates and Heights ---
 		const columnAreaHeight = this.padding.bottom * 0.5;
+		const pointsMappingHeight = this.graphHeight * 0.9; // Use 90% of graphHeight for points
+
 		this.points.forEach(point => {
-			point.y = this.padding.top + this.graphHeight - p.map(point.timeSeconds, this.yMin, this.yMax, 0, this.graphHeight);
+			// Map points within the top 90% of the graphHeight area
+			point.y = this.padding.top + p.map(point.timeSeconds, this.yMin, this.yMax, pointsMappingHeight, 0);
 		});
 		this.workoutColumns.forEach(col => {
+			// Keep column height calculation relative to bottom padding area
 			const colHeight = p.map(col.activity.moving_time, 0, this.maxDuration, 0, columnAreaHeight);
 			col.height = Math.max(1, colHeight);
+			// Keep column Y position relative to the bottom padding line
 			col.y = this.canvasHeight - this.padding.bottom - col.height;
 		});
 
