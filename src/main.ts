@@ -5,8 +5,8 @@ import { generateSampleData } from './utils'
 
 // Clear out any existing content and add a container for the graph and info box
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <div id="graph-container"></div>
   <div id="info-box"></div>
+  <div id="graph-container"></div>
 `
 
 // Generate the sample data based on the image
@@ -18,16 +18,11 @@ let renderer: GoalGraphRenderer
 const sketch = (p: p5) => {
 
 	p.setup = () => {
-		// Create canvas based on initial window size or defaults
-		const canvasWidth = Math.min(p.windowWidth * 0.9, 800)
-		const canvasHeight = 500
-		const canvas = p.createCanvas(canvasWidth, canvasHeight)
-		canvas.parent('graph-container') // Add canvas to the graph container
-		p.textFont('Arial') // Set a default font
+		// Renderer will handle canvas creation and setup
+		p.textFont('Arial') // Set a default font globally if needed
 
-		// Instantiate the renderer class, passing the p5 instance and data
-		// Trial day is 'sunday' based on image labels "Sun ..." for trial points
-		renderer = new GoalGraphRenderer(p, start, goal, activities, 'sunday')
+		// Instantiate the renderer class, passing the p5 instance, data, and parent container ID
+		renderer = new GoalGraphRenderer(p, start, goal, activities, 'graph-container', 'sunday')
 	}
 
 	p.draw = () => {

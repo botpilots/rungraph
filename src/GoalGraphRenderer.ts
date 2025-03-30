@@ -65,12 +65,15 @@ export class GoalGraphRenderer {
 
 	// Reference to the HTML element for the info box
 	private infoBoxElement: HTMLElement | null = null;
+	// Reference to the parent container element
+	private parentElement: HTMLElement | null = null;
 
 	constructor(
 		p: p5,
 		start: { currentRaceTime: string; date: Date },
 		goal: { targetRaceTime: string; dateOfRace: Date },
 		activities: StravaActivity[],
+		parentContainerId: string, // Added parent container ID
 		trialDay: string = 'sunday' // Match image data
 	) {
 		this.p = p;
@@ -78,9 +81,22 @@ export class GoalGraphRenderer {
 		this.goalData = goal;
 		this.activities = activities;
 		this.trialDay = trialDay.toLowerCase();
+		this.parentElement = document.getElementById(parentContainerId);
 
-		// Initialize dimensions based on p5 instance if available
-		this.canvasWidth = Math.min(this.p.windowWidth - 20, 800);
+		if (!this.parentElement) {
+			throw new Error(`Parent container with ID '${parentContainerId}' not found.`);
+		}
+
+		// --- Initialize dimensions and create canvas ---
+		// Use parent dimensions, fall back to defaults/window if needed
+		this.canvasWidth = Math.min(this.parentElement.clientWidth || this.p.windowWidth - 20, 800);
+		this.canvasHeight = this.parentElement.clientHeight || 500; // Use parent height
+
+		// Create canvas and attach to parent
+		const canvas = this.p.createCanvas(this.canvasWidth, this.canvasHeight);
+		canvas.parent(this.parentElement);
+
+		// --- Calculate graph dimensions based on dynamic canvas size ---
 		this.graphWidth = this.canvasWidth - this.padding.left - this.padding.right;
 		this.graphHeight = this.canvasHeight - this.padding.top - this.padding.bottom;
 		this.sliderTrackY = this.canvasHeight - this.padding.bottom;
@@ -428,21 +444,15 @@ export class GoalGraphRenderer {
 
 		const p = this.p;
 		let infoText: string[] = [];
-		// Keep lineHeight and textPadding for generating content logic if needed, but remove drawing coords
-		// const lineHeight = 14;
-		// const textPadding = 10;
-		// REMOVED: infoBoxX, infoBoxY, infoBoxWidth calculations
 
-		// Keep the logic to populate infoText based on hoveredPoint/hoveredColumn
 		if (this.hoveredPoint) {
-			// Display Point Info (Trial/Start/Goal)
+			// --- Populate infoText for hovered point --- 
 			infoText.push(`<strong>${this.hoveredPoint.type.charAt(0).toUpperCase() + this.hoveredPoint.type.slice(1)} Point</strong>`);
-			infoText.push(`Date: ${this.hoveredPoint.date.toLocaleDateString('en-CA')}`); // YYYY-MM-DD
-			infoText.push(`Time: ${this.hoveredPoint.displayTime}`); // Display full time string including " HM" if present
+			infoText.push(`Date: ${this.hoveredPoint.date.toLocaleDateString('en-CA')}`);
+			infoText.push(`Time: ${this.hoveredPoint.displayTime}`);
 
 			if (this.hoveredPoint.activity) {
 				infoText.push(`Activity: ${this.hoveredPoint.activity.name}`);
-				// Add distance if available
 				if (typeof this.hoveredPoint.activity.distance === 'number') {
 					infoText.push(`Distance: ${(this.hoveredPoint.activity.distance / 1000).toFixed(1)} km`);
 				}
@@ -452,14 +462,12 @@ export class GoalGraphRenderer {
 				infoText.push(`Target Time`);
 			}
 
-
-			// Add Week Summary for Trial points
 			if (this.hoveredPoint.type === 'trial' && this.hoveredPoint.activity) {
-				infoText.push(''); // Separator line (will become <hr> or empty <p>)
+				infoText.push('');
 				infoText.push('<strong>Week Summary:</strong>');
 				const weekStart = getStartOfWeek(this.hoveredPoint.date);
 				const weekEnd = new Date(weekStart);
-				weekEnd.setDate(weekStart.getDate() + 7); // Week ends *before* the next Monday
+				weekEnd.setDate(weekStart.getDate() + 7);
 
 				let weeklyDistance = 0;
 				let weeklyTime = 0;
@@ -467,7 +475,6 @@ export class GoalGraphRenderer {
 
 				this.activities.forEach(act => {
 					const actDate = new Date(act.start_date_local);
-					// Check if activity falls within the Mon-Sun week of the trial point
 					if (actDate >= weekStart && actDate < weekEnd) {
 						weekActivityCount++;
 						weeklyDistance += act.distance || 0;
@@ -481,14 +488,13 @@ export class GoalGraphRenderer {
 			}
 
 		} else if (this.hoveredColumn) {
-			// Display Workout Column Info
+			// --- Populate infoText for hovered column --- 
 			const activity = this.hoveredColumn.activity;
 			infoText.push(`<strong>Workout: ${activity.name}</strong>`);
-			infoText.push(`Date: ${new Date(activity.start_date_local).toLocaleDateString('en-CA')}`); // YYYY-MM-DD format
+			infoText.push(`Date: ${new Date(activity.start_date_local).toLocaleDateString('en-CA')}`);
 			infoText.push(`Dist: ${(activity.distance / 1000).toFixed(2)} km`);
 			infoText.push(`Time: ${formatSecondsToTime(activity.moving_time)}`);
 
-			// Calculate and display pace if distance is available
 			const paceSecondsPerKm = activity.distance > 0 ? (activity.moving_time / (activity.distance / 1000)) : 0;
 			if (paceSecondsPerKm > 0) {
 				const paceMinutes = Math.floor(paceSecondsPerKm / 60);
@@ -498,7 +504,6 @@ export class GoalGraphRenderer {
 				infoText.push(`Pace: N/A`);
 			}
 
-			// Display HR and Suffer Score if available
 			if (activity.average_heartrate) {
 				infoText.push(`Avg HR: ${activity.average_heartrate.toFixed(0)} bpm`);
 			}
@@ -506,35 +511,24 @@ export class GoalGraphRenderer {
 				infoText.push(`Suffer Score: ${activity.suffer_score}`);
 			}
 
+		} else {
+			// --- Default text when nothing is hovered --- 
+			infoText.push("Move the slider over points or workout bars to see details.");
 		}
 
 		// --- Update the HTML info box element --- 
-		if (infoText.length > 0) {
-			// Simple HTML escaping and formatting
-			const infoHTML = infoText.map(line =>
-				line === ''
-					? '<hr style="border: none; border-top: 1px solid #ddd; margin: 4px 0;">'
-					: `<p style="margin: 0; padding: 1px 0;">${line.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
-			).join('');
-			this.infoBoxElement.innerHTML = infoHTML;
-			this.infoBoxElement.style.display = 'block'; // Show the box
-		} else {
-			// If no point/column is hovered, hide the box
-			this.infoBoxElement.innerHTML = ''; // Clear content
-			this.infoBoxElement.style.display = 'none'; // Hide the box
-		}
+		// Generate HTML, allowing tags like <strong> and <hr>
+		const infoHTML = infoText.map(line =>
+			line === ''
+				? '<hr>' // Use standard hr tag, styled by CSS
+				: `<p>${line}</p>` // Wrap each line in a paragraph tag, allow inner HTML like <strong>
+		).join('');
+		this.infoBoxElement.innerHTML = infoHTML;
+		// No longer need to set display style, it's always visible via CSS
+		// this.infoBoxElement.style.display = 'block'; 
+		// this.infoBoxElement.style.display = 'none'; 
 
 		// REMOVE p5 drawing code for the info box background and text
-		// const infoBoxHeight = Math.max(30 + textPadding * 2, infoText.length * lineHeight + textPadding * 2); // Adjusted min height
-		// p.fill(248, 248, 248, 235); 
-		// p.noStroke();
-		// p.rect(this.padding.left, infoBoxY - textPadding, infoBoxWidth + textPadding * 2, infoBoxHeight, 5);
-		// p.fill(20);
-		// p.textSize(11); 
-		// p.textAlign(p.LEFT, p.TOP);
-		// for (let i = 0; i < infoText.length; i++) {
-		// 	p.text(infoText[i], infoBoxX, infoBoxY + i * lineHeight);
-		// }
 	}
 
 
@@ -592,29 +586,36 @@ export class GoalGraphRenderer {
 	// --- Handle Window Resizing ---
 	public windowResized(): void {
 		const p = this.p;
-		// Use windowWidth - small margin, capped at 800
-		this.canvasWidth = Math.min(p.windowWidth - 20, 800);
-		// Keep height fixed or make it responsive too? Let's keep it fixed for now.
-		// this.canvasHeight = 500;
+		if (!this.parentElement) return; // Should not happen if constructor succeeded
+
+		// --- Recalculate canvas size based on parent container ---
+		this.canvasWidth = Math.min(this.parentElement.clientWidth || this.p.windowWidth - 20, 800);
+		this.canvasHeight = this.parentElement.clientHeight || 500; // Use parent height
 		p.resizeCanvas(this.canvasWidth, this.canvasHeight);
 
-		// Recalculate dimensions dependent on canvas size
+		// --- Recalculate graph dimensions dependent on new canvas size ---
 		this.graphWidth = this.canvasWidth - this.padding.left - this.padding.right;
 		this.graphHeight = this.canvasHeight - this.padding.top - this.padding.bottom;
 		this.sliderTrackY = this.canvasHeight - this.padding.bottom; // Update slider track y-position
 
 		// Store the current slider position ratio before reprocessing data
-		const sliderRatio = this.sliderX !== null
-			? (this.sliderX - this.padding.left) / (this.canvasWidth - this.padding.left - this.padding.right)
+		const currentGraphWidth = this.canvasWidth - this.padding.left - this.padding.right;
+		const sliderRatio = this.sliderX !== null && currentGraphWidth > 0
+			? (this.sliderX - this.padding.left) / currentGraphWidth
 			: 0;
 
 
 		// Re-process data to recalculate coordinates based on new dimensions
 		this.processData();
 
-		// Restore the slider position based on the ratio
-		this.sliderX = this.padding.left + sliderRatio * this.graphWidth;
-
+		// Restore the slider position based on the ratio and NEW graphWidth
+		// Ensure graphWidth is positive before calculating slider position
+		const newGraphWidth = this.canvasWidth - this.padding.left - this.padding.right;
+		if (newGraphWidth > 0) {
+			this.sliderX = this.padding.left + sliderRatio * newGraphWidth;
+		} else {
+			this.sliderX = this.padding.left; // Default to start if width is zero/negative
+		}
 	}
 
 } // End GoalGraphRenderer Class
