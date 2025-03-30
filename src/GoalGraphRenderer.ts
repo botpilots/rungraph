@@ -50,7 +50,7 @@ export class GoalGraphRenderer {
 
 	// Font sizes
 	private axisLabelFontSize = 15;
-	private pointLabelFontSize = 12;
+	private pointLabelFontSize = 15;
 
 	// Data structures
 	private points: Point[] = [];
@@ -65,8 +65,8 @@ export class GoalGraphRenderer {
 	private hoveredColumn: WorkoutColumn | null = null;
 	private isDraggingSlider = false;
 	private readonly pointSize = 10;
-	private readonly knobWidth = this.pointSize * 1.5;
-	private readonly knobHeight = this.pointSize * 1.2;
+	private readonly knobWidth = this.pointSize * 1.6;
+	private readonly knobHeight = this.pointSize * 2.0;
 	private sliderTrackY = 0;
 
 	// Horizontal Scroll / Pan / Zoom State
@@ -460,9 +460,12 @@ export class GoalGraphRenderer {
 
 			// Draw label if point is roughly visible
 			if (drawX >= visibleLeft && drawX <= visibleRight) {
-				p.noStroke(); p.fill(pointColor); p.textSize(this.pointLabelFontSize); p.textAlign(p.LEFT, p.CENTER);
+				p.noStroke(); p.fill(pointColor); p.textSize(this.pointLabelFontSize);
 				const timeLabel = point.displayTime.match(/^(\\d{2}:\\d{2}:\\d{2})/)?.[1] || point.displayTime;
-				p.text(timeLabel, drawX + this.pointSize * 0.8, point.y);
+
+				// Always position text above the point
+				p.textAlign(p.CENTER, p.BOTTOM);
+				p.text(timeLabel, drawX, point.y - this.pointSize);
 			}
 		});
 	}
@@ -471,8 +474,38 @@ export class GoalGraphRenderer {
 	private drawVerticalIndicator(): void {
 		if (this.sliderX === null) return;
 		const p = this.p;
+
+		// Find the top and bottom y positions of points near the slider
+		const sliderContentX = (this.sliderX ?? 0) + this.viewOffsetX;
+
+		// Find the minimum and maximum y values of all visible points
+		let minY = this.canvasHeight;
+		let maxY = this.padding.top;
+
+		// Check all points to find min/max Y values
+		this.points.forEach(point => {
+			if (point.currentX >= this.padding.left && point.currentX <= this.canvasWidth - this.padding.right) {
+				minY = Math.min(minY, point.y);
+				maxY = Math.max(maxY, point.y);
+			}
+		});
+
+		// Check all workout columns heights
+		this.workoutColumns.forEach(col => {
+			if (col.currentX >= this.padding.left && col.currentX <= this.canvasWidth - this.padding.right) {
+				maxY = Math.max(maxY, col.y + col.height);
+			}
+		});
+
+		// If no points are visible, use default bounds
+		if (minY === this.canvasHeight || maxY === this.padding.top) {
+			minY = this.padding.top;
+			maxY = this.canvasHeight - this.padding.bottom;
+		}
+
+		// Draw the vertical indicator line between min and max Y
 		p.stroke(120, 120, 120, 180); p.strokeWeight(1); p.drawingContext.setLineDash([4, 4]);
-		p.line(this.sliderX, this.padding.top, this.sliderX, this.canvasHeight - this.padding.bottom);
+		p.line(this.sliderX, minY, this.sliderX, maxY);
 		p.drawingContext.setLineDash([]);
 	}
 
