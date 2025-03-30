@@ -1,30 +1,12 @@
 import './style.css'
-import typescriptLogo from './typescript.svg'
-import viteLogo from '/vite.svg'
-import { setupCounter } from './counter.ts'
 import p5 from 'p5'
 import { GoalGraphRenderer } from './GoalGraphRenderer'
 import { generateSampleData } from './utils'
 
+// Clear out any existing content and add a container for the graph
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <div>
-    <a href="https://vite.dev" target="_blank">
-      <img src="${viteLogo}" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://www.typescriptlang.org/" target="_blank">
-      <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-    </a>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
-    </p>
-  </div>
+  <div id="graph-container"></div>
 `
-
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
 
 // Generate the sample data based on the image
 const { start, goal, activities } = generateSampleData()
@@ -38,7 +20,8 @@ const sketch = (p: p5) => {
 		// Create canvas based on initial window size or defaults
 		const canvasWidth = Math.min(p.windowWidth * 0.9, 800)
 		const canvasHeight = 500
-		p.createCanvas(canvasWidth, canvasHeight)
+		const canvas = p.createCanvas(canvasWidth, canvasHeight)
+		canvas.parent('graph-container') // Add canvas to the graph container
 		p.textFont('Arial') // Set a default font
 
 		// Instantiate the renderer class, passing the p5 instance and data
