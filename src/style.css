@@ -19,6 +19,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background-color: #f5f5f5;
+  overflow-x: auto;
 }
 
 #app {
@@ -29,6 +30,7 @@ body {
   text-align: center;
   background-color: white;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+  overflow-x: auto;
 }
 
 #graph-container {
@@ -37,6 +39,8 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
+  min-width: 800px;
+  overflow-x: auto;
 }
 
 canvas {
@@ -47,5 +51,11 @@ canvas {
 @media (max-width: 768px) {
   #app {
     padding: 0.5rem;
+    overflow-x: auto;
+  }
+  
+  body, #app, #graph-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
