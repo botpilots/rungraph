@@ -44,7 +44,7 @@ export class GoalGraphRenderer {
 	// Canvas and layout properties
 	private canvasWidth = 800;
 	private canvasHeight = 500;
-	private padding = { top: 50, right: 80, bottom: 120, left: 10 }; // Restored right padding
+	private padding = { top: 50, right: 80, bottom: 120, left: 40 }; // Increased left padding for label
 	private graphWidth = 0; // Visible graph area width
 	private graphHeight = 0; // Visible graph area height
 
@@ -129,8 +129,8 @@ export class GoalGraphRenderer {
 		this.canvasWidth = Math.max(50, this.parentElement.clientWidth); // Removed max 800 limit and fallback
 		this.canvasHeight = Math.max(50, this.parentElement.clientHeight); // Removed fallback
 
-		// Recalculate graph drawing area - Use only left padding for visual width
-		this.graphWidth = Math.max(1, this.canvasWidth - this.padding.left); // Right padding is only for label clipping
+		// Recalculate graph drawing area - Use both paddings for correct scaling
+		this.graphWidth = Math.max(1, this.canvasWidth - this.padding.left - this.padding.right);
 		this.graphHeight = Math.max(1, this.canvasHeight - this.padding.top - this.padding.bottom);
 		this.sliderTrackY = this.canvasHeight - this.padding.bottom;
 
@@ -185,14 +185,17 @@ export class GoalGraphRenderer {
 		const minOffsetX = Math.max(0, this.contentMinX - this.padding.left);
 		// Calculate the currently needed total width within the view
 		const visibleContentWidth = this.contentMaxX - this.contentMinX;
+		// Calculate the available drawing width between left and right padding
+		const availableDrawWidth = this.canvasWidth - this.padding.left - this.padding.right;
 
 		let targetOffsetX = this.viewOffsetX;
 
-		// If the total content is narrower than the available graph area, center it.
-		if (visibleContentWidth < this.graphWidth) {
-			targetOffsetX = this.contentMinX - this.padding.left - (this.graphWidth - visibleContentWidth) / 2;
+		// If the total content is narrower than the available drawing area, center it within that area.
+		if (visibleContentWidth < availableDrawWidth) {
+			// Center content by adjusting offset relative to left padding
+			targetOffsetX = this.contentMinX - this.padding.left - (availableDrawWidth - visibleContentWidth) / 2;
 		} else {
-			// Otherwise, constrain within calculated min/max
+			// Otherwise, constrain within calculated min/max offset boundaries
 			targetOffsetX = Math.max(minOffsetX, Math.min(targetOffsetX, maxOffsetX));
 		}
 
@@ -345,6 +348,7 @@ export class GoalGraphRenderer {
 
 		// Define visible boundaries for drawing/clipping
 		const visibleLeft = this.padding.left;
+		// Use padding.right for the clipping boundary, even if interaction uses padding.left
 		const visibleRight = this.canvasWidth - this.padding.right;
 		const drawBuffer = 50; // Pixels outside visible area to still consider
 
@@ -359,6 +363,24 @@ export class GoalGraphRenderer {
 	}
 
 	// --- Drawing Helper Functions ---
+
+	private getVisibleContentBoundaries(): { startX: number, endX: number } {
+		// Calculate the visible screen X coordinates of the content based on current offset
+		const contentStartXOnScreen = this.contentMinX - this.viewOffsetX;
+		const contentEndXOnScreen = this.contentMaxX - this.viewOffsetX;
+
+		// Determine the effective start boundary (max of left padding and content start)
+		const effectiveStartX = Math.max(this.padding.left, contentStartXOnScreen);
+
+		// Determine the effective end boundary (min of right padding boundary and content end)
+		const effectiveEndX = Math.min(this.canvasWidth - this.padding.right, contentEndXOnScreen);
+
+		// Ensure start is not greater than end (can happen if content is entirely outside view)
+		return {
+			startX: Math.min(effectiveStartX, effectiveEndX),
+			endX: effectiveEndX
+		};
+	}
 
 	private drawXAxis(visibleLeft: number, visibleRight: number, buffer: number): void {
 		const p = this.p;
@@ -393,12 +415,8 @@ export class GoalGraphRenderer {
 			p.stroke(200); p.strokeWeight(1); p.line(drawX, axisY, drawX, axisY + 5); // Tick
 		});
 
-		// Draw axis line between the visible extent of the *content*, clamped by left padding visually
-		const lineStartX = Math.max(this.padding.left, this.contentMinX - this.viewOffsetX);
-		// Line should visually extend to canvas edge (minus left padding), unless content ends sooner
-		const visualAxisEndX = this.canvasWidth - this.padding.left;
-		const contentEndXOnScreen = Math.max(lineStartX, this.contentMaxX - this.viewOffsetX);
-		const lineEndX = Math.min(visualAxisEndX, contentEndXOnScreen);
+		// Draw axis line between the effective visible boundaries
+		const { startX: lineStartX, endX: lineEndX } = this.getVisibleContentBoundaries();
 
 		p.stroke(150); p.strokeWeight(1);
 		if (lineEndX > lineStartX) { // Only draw if there's a visible line segment
@@ -569,12 +587,11 @@ export class GoalGraphRenderer {
 			maxY = Math.min(this.canvasHeight - this.padding.bottom, maxY + 10);
 		}
 
-		// Calculate the visible screen X coordinates of the content boundaries
-		const visibleContentStartX = Math.max(this.padding.left, this.contentMinX - this.viewOffsetX);
-		const visibleContentEndX = Math.min(this.canvasWidth - this.padding.right, this.contentMaxX - this.viewOffsetX);
+		// Get the effective boundaries for drawing/clamping
+		const { startX: effectiveStartX, endX: effectiveEndX } = this.getVisibleContentBoundaries();
 
-		// Clamp the slider's visual X position to the visible content boundaries *for drawing the line only*
-		const indicatorDrawX = p.constrain(this.sliderX, visibleContentStartX, visibleContentEndX);
+		// Clamp the slider's visual X position to the effective boundaries *for drawing the line only*
+		const indicatorDrawX = p.constrain(this.sliderX, effectiveStartX, effectiveEndX);
 
 		// Draw the vertical indicator line between min and max Y at the clamped X position
 		p.stroke(120, 120, 120, 180); p.strokeWeight(1); p.drawingContext.setLineDash([4, 4]);
@@ -747,9 +764,9 @@ export class GoalGraphRenderer {
 
 		// Check for Graph Pan Start 
 		if (!this.isDraggingSlider && this.totalGraphContentWidth > this.graphWidth) {
-			// Allow panning if touch is within the visual graph area (left padding to canvas edge minus left padding)
+			// Pan area is defined by both paddings
 			const isInsidePanArea = touchPos.y > this.padding.top && touchPos.y < this.canvasHeight - this.padding.bottom &&
-				touchPos.x > this.padding.left && touchPos.x < this.canvasWidth - this.padding.left;
+				touchPos.x > this.padding.left && touchPos.x < this.canvasWidth - this.padding.right;
 
 			if (isInsidePanArea) {
 				this.isDraggingGraph = true;
@@ -777,16 +794,11 @@ export class GoalGraphRenderer {
 
 		// Handle Slider Drag
 		if (this.isDraggingSlider && this.sliderX !== null) {
-			// Calculate visible content boundaries for clamping
-			const visibleContentStartX = Math.max(this.padding.left, this.contentMinX - this.viewOffsetX);
-			const visibleContentEndX = Math.max(visibleContentStartX, this.contentMaxX - this.viewOffsetX); // Ensure end >= start
-			// Visual max slider position is near canvas edge (respecting left padding)
-			const visualSliderMaxX = this.canvasWidth - this.padding.left;
-			// Actual max is limited by the visual max OR the content end, whichever is smaller
-			const actualSliderMaxX = Math.min(visualSliderMaxX, visibleContentEndX);
+			// Get the effective boundaries for clamping slider movement
+			const { startX: effectiveStartX, endX: effectiveEndX } = this.getVisibleContentBoundaries();
 
-			// Clamp slider position
-			const newSliderX = this.p.constrain(touchPos.x, visibleContentStartX, actualSliderMaxX);
+			// Clamp slider position based on effective boundaries
+			const newSliderX = this.p.constrain(touchPos.x, effectiveStartX, effectiveEndX);
 			this.sliderX = newSliderX;
 		}
 		// Handle Graph Pan
@@ -829,9 +841,9 @@ export class GoalGraphRenderer {
 		}
 		// Graph Panning Check (if not dragging slider and content is scrollable)
 		else if (this.totalGraphContentWidth > this.graphWidth &&
-			// Allow panning if mouse is within the visual graph area (left padding to canvas edge minus left padding)
+			// Pan area is defined by both paddings
 			p.mouseY > this.padding.top && p.mouseY < this.canvasHeight - this.padding.bottom &&
-			p.mouseX > this.padding.left && p.mouseX < this.canvasWidth - this.padding.left) {
+			p.mouseX > this.padding.left && p.mouseX < this.canvasWidth - this.padding.right) {
 			this.isDraggingGraph = true;
 			this.isDraggingSlider = false;
 			this.dragStartX = p.mouseX;
@@ -843,16 +855,11 @@ export class GoalGraphRenderer {
 	private handleMouseDragged(): void {
 		const p = this.p;
 		if (this.isDraggingSlider && this.sliderX !== null) {
-			// Calculate visible content boundaries for clamping
-			const visibleContentStartX = Math.max(this.padding.left, this.contentMinX - this.viewOffsetX);
-			const visibleContentEndX = Math.max(visibleContentStartX, this.contentMaxX - this.viewOffsetX); // Ensure end >= start
-			// Visual max slider position is near canvas edge (respecting left padding)
-			const visualSliderMaxX = this.canvasWidth - this.padding.left;
-			// Actual max is limited by the visual max OR the content end, whichever is smaller
-			const actualSliderMaxX = Math.min(visualSliderMaxX, visibleContentEndX);
+			// Get the effective boundaries for clamping slider movement
+			const { startX: effectiveStartX, endX: effectiveEndX } = this.getVisibleContentBoundaries();
 
-			// Clamp slider position
-			this.sliderX = p.constrain(p.mouseX, visibleContentStartX, actualSliderMaxX);
+			// Clamp slider position based on effective boundaries
+			this.sliderX = p.constrain(p.mouseX, effectiveStartX, effectiveEndX);
 		}
 		else if (this.isDraggingGraph) {
 			const dx = p.mouseX - this.dragStartX;
