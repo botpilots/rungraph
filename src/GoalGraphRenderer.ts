@@ -841,9 +841,11 @@ export class GoalGraphRenderer {
 		if (event.touches.length === 0) {
 			if (this.isDraggingSlider) {
 				this.isDraggingSlider = false;
+				this.lastWiggleTime = this.p.millis(); // Reset wiggle timer on release
 			}
 			if (this.isDraggingGraph) {
 				this.isDraggingGraph = false;
+				this.lastWiggleTime = this.p.millis(); // Reset wiggle timer on release
 			}
 		}
 	}
@@ -906,10 +908,12 @@ export class GoalGraphRenderer {
 		const p = this.p;
 		if (this.isDraggingSlider) {
 			this.isDraggingSlider = false;
+			this.lastWiggleTime = p.millis(); // Reset wiggle timer on release
 			p.cursor(p.ARROW);
 		}
 		if (this.isDraggingGraph) {
 			this.isDraggingGraph = false;
+			this.lastWiggleTime = p.millis(); // Reset wiggle timer on release
 			p.cursor(p.ARROW);
 		}
 	}
