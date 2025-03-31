@@ -49,7 +49,7 @@ export class GoalGraphRenderer {
 	private graphHeight = 0; // Visible graph area height
 
 	// Font sizes
-	private axisLabelFontSize = 15;
+	private axisLabelFontSize = 11;
 	private pointLabelFontSize = 15;
 
 	// Data structures
@@ -374,36 +374,91 @@ export class GoalGraphRenderer {
 	private drawXAxis(visibleLeft: number, visibleRight: number, buffer: number): void {
 		const p = this.p;
 		const axisY = this.canvasHeight - this.padding.bottom;
-		p.textAlign(p.CENTER, p.TOP); p.textSize(this.axisLabelFontSize); p.fill(100);
+		const labelOffsetY = 12; // Vertical offset for start/end labels
+		const connectingLineLength = 10; // Length of the small line connecting tilted labels
+		let tiltedLabelOffsetX = -5; // Horizontal offset for tilted labels
+		let tiltedLabelOffsetY = 15; // Vertical offset specifically for tilted labels
 
-		const labelPoints = [ /* ... get points ... */
+		p.fill(150); // Use gray for all text labels
+		p.stroke(150); // Use gray for lines
+		p.strokeWeight(1); // Thin lines
+		p.textSize(this.axisLabelFontSize * 0.9); // Slightly smaller font for dates
+
+		// Get start, goal, and trial points for labeling
+		const labelPoints = [
 			this.points.find(pt => pt.type === 'start'),
 			...this.points.filter(pt => pt.type === 'trial'),
 			this.points.find(pt => pt.type === 'goal')
 		].filter(pt => pt !== undefined) as Point[];
-		const uniqueDateLabels = new Map<string, Point>();
-		labelPoints.forEach(point => { /* ... find unique labels ... */
-			const dateKey = point.date.toLocaleDateString();
-			const existing = uniqueDateLabels.get(dateKey);
-			if (!existing || (point.type !== 'start' && existing.type === 'start') || point.type === 'goal') {
-				uniqueDateLabels.set(dateKey, point);
+
+		// Find the very first and very last points for special vertical labeling
+		const firstPoint = this.points[0];
+		const lastPoint = this.points[this.points.length - 1];
+
+		labelPoints.forEach(point => {
+			const drawX = point.currentX;
+			// Basic Clipping: Only process points potentially visible
+			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return;
+
+			const dateStr = point.date.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+			// --- Draw Start and Goal Labels (Vertically) ---
+			if (point === firstPoint || point === lastPoint) {
+				p.push();
+				// *** USE labelOffsetY for vertical positioning ***
+				p.translate(drawX, axisY + labelOffsetY);
+				p.rotate(p.radians(-90)); // Rotate -90 degrees for vertical text reading bottom-to-top
+				p.textAlign(p.RIGHT, p.CENTER); // Align right edge of text to the translated point
+				p.noStroke(); // No stroke for text itself
+				p.fill(150); // Gray text
+				p.text(dateStr, 0, 0); // Draw text at the rotated origin
+				p.pop();
+				// Draw tick mark for start/end points
+				p.stroke(200); p.strokeWeight(1);
+				p.line(drawX, axisY, drawX, axisY + 5); // Keep tick short
+			}
+			// --- Draw Trial Week Labels (Tilted) ---
+			else if (point.type === 'trial') {
+				// Calculate week number relative to the start date's week
+				const startWeekBeginning = getStartOfWeek(this.startData.date);
+				const pointWeekBeginning = getStartOfWeek(point.date);
+				const weekDiffMillis = pointWeekBeginning.getTime() - startWeekBeginning.getTime();
+				// Add a small buffer (half a day) to handle potential floating point issues near week boundaries
+				const weekNumber = Math.max(1, Math.floor(weekDiffMillis / (7 * 24 * 60 * 60 * 1000) + 0.5) + 1);
+
+				let labelText = `Week ${weekNumber}`;
+
+				// Add date in 3-week view
+				if (this.viewMode === '3weeks') {
+					tiltedLabelOffsetX = -15;
+					tiltedLabelOffsetY = 30;
+					const weekStartDateStr = pointWeekBeginning.toISOString().split('T')[0];
+					// *** Create multi-line string for Week and Date ***
+					labelText = `Week ${weekNumber}\n${weekStartDateStr}`;
+				} else {
+					// Ensure labelText is just "Week X" in full view
+					labelText = `Week ${weekNumber}`;
+				}
+
+				// Draw connecting line from axis down
+				p.stroke(180); // Slightly lighter gray for connecting line
+				p.line(drawX, axisY, drawX, axisY + connectingLineLength);
+
+				// Draw tilted text
+				p.push();
+				// *** USE tiltedLabelOffsetY for vertical positioning ***
+				p.translate(drawX, axisY + connectingLineLength + tiltedLabelOffsetY);
+				p.rotate(p.radians(45)); // Tilt 45 degrees
+				p.textAlign(p.LEFT, p.BOTTOM); // Align bottom-left of text
+				p.noStroke();
+				p.fill(150); // Gray text
+				// *** USE tiltedLabelOffsetX for horizontal positioning ***
+				p.text(labelText, tiltedLabelOffsetX, 0);
+				p.pop();
 			}
 		});
 
-		uniqueDateLabels.forEach(point => {
-			const drawX = point.currentX;
-			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return; // Clipping
-
-			const dateLabel = `${point.date.toLocaleString('en-US', { weekday: 'short' })} ${point.date.getDate()} ${ /* ... month ... */ point.date.toLocaleString('en-US', { month: 'short' })}`;
-			p.push();
-			p.translate(drawX, axisY + 15); p.rotate(p.radians(45)); p.textAlign(p.LEFT, p.BOTTOM);
-			let labelColor = '#ff7f0e';
-			if (point.type === 'start') labelColor = '#2ca02c'; else if (point.type === 'goal') labelColor = '#d62728';
-			p.fill(labelColor); p.text(dateLabel, 5, 0);
-			p.pop();
-			p.stroke(200); p.strokeWeight(1); p.line(drawX, axisY, drawX, axisY + 5); // Tick
-		});
-
+		// Draw main axis line
 		// Draw axis line between the visible extent of the *content*, clamped by left padding visually
 		const lineStartX = Math.max(this.padding.left, this.contentMinX - this.viewOffsetX);
 		// Line should visually extend to canvas edge (minus right padding), unless content ends sooner
@@ -411,7 +466,7 @@ export class GoalGraphRenderer {
 		const contentEndXOnScreen = Math.max(lineStartX, this.contentMaxX - this.viewOffsetX);
 		const lineEndX = Math.min(visualAxisEndX, contentEndXOnScreen);
 
-		p.stroke(150); p.strokeWeight(1);
+		p.stroke(150); p.strokeWeight(1); // Reset stroke for axis line
 		if (lineEndX > lineStartX) { // Only draw if there's a visible line segment
 			p.line(lineStartX, axisY, lineEndX, axisY);
 		}
