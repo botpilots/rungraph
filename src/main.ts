@@ -36,23 +36,13 @@ const sketch = (p: p5) => {
 		// This helps avoid timing issues where the container size might not be ready during the constructor.
 		if (renderer) {
 			renderer.windowResized();
-		} else {
-			console.error("Renderer assignment failed in setup!");
 		}
 	}
 
 	p.draw = () => {
 		// Call the renderer's draw method in each frame
 		if (renderer) {
-			try {
-				renderer.draw()
-			} catch (e) {
-				console.error("Error calling renderer.draw():", e);
-				console.error("Renderer object was:", renderer); // Log the object again on error
-				p.noLoop(); // Stop the draw loop to prevent flooding console
-			}
-		} else {
-			console.warn("Renderer not ready in draw loop");
+			renderer.draw()
 		}
 	}
 
