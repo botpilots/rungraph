@@ -503,7 +503,7 @@ export class GoalGraphRenderer {
 
 	private drawPoints(visibleLeft: number, visibleRight: number, buffer: number): void {
 		const p = this.p;
-		const hoverRadius = this.pointSize / 2 + 3;
+		const hoverRadius = this.pointSize / 2;
 		this.points.forEach(point => {
 			const drawX = point.currentX;
 			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return; // Clipping
