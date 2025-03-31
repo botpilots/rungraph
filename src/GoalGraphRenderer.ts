@@ -44,7 +44,7 @@ export class GoalGraphRenderer {
 	// Canvas and layout properties
 	private canvasWidth = 800;
 	private canvasHeight = 500;
-	private padding = { top: 50, right: 80, bottom: 120, left: 10 }; // Restored right padding
+	private padding = { top: 50, right: 10, bottom: 120, left: 10 }; // Restored right padding
 	private graphWidth = 0; // Visible graph area width
 	private graphHeight = 0; // Visible graph area height
 
@@ -129,8 +129,8 @@ export class GoalGraphRenderer {
 		this.canvasWidth = Math.max(50, this.parentElement.clientWidth); // Removed max 800 limit and fallback
 		this.canvasHeight = Math.max(50, this.parentElement.clientHeight); // Removed fallback
 
-		// Recalculate graph drawing area - Use only left padding for visual width
-		this.graphWidth = Math.max(1, this.canvasWidth - this.padding.left); // Right padding is only for label clipping
+		// Recalculate graph drawing area - Account for both left and right padding
+		this.graphWidth = Math.max(1, this.canvasWidth - this.padding.left - this.padding.right);
 		this.graphHeight = Math.max(1, this.canvasHeight - this.padding.top - this.padding.bottom);
 		this.sliderTrackY = this.canvasHeight - this.padding.bottom;
 
@@ -395,8 +395,8 @@ export class GoalGraphRenderer {
 
 		// Draw axis line between the visible extent of the *content*, clamped by left padding visually
 		const lineStartX = Math.max(this.padding.left, this.contentMinX - this.viewOffsetX);
-		// Line should visually extend to canvas edge (minus left padding), unless content ends sooner
-		const visualAxisEndX = this.canvasWidth - this.padding.left;
+		// Line should visually extend to canvas edge (minus right padding), unless content ends sooner
+		const visualAxisEndX = this.canvasWidth - this.padding.right;
 		const contentEndXOnScreen = Math.max(lineStartX, this.contentMaxX - this.viewOffsetX);
 		const lineEndX = Math.min(visualAxisEndX, contentEndXOnScreen);
 
