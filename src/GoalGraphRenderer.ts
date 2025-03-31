@@ -569,17 +569,10 @@ export class GoalGraphRenderer {
 			maxY = Math.min(this.canvasHeight - this.padding.bottom, maxY + 10);
 		}
 
-		// Calculate the visible screen X coordinates of the content boundaries
-		const visibleContentStartX = Math.max(this.padding.left, this.contentMinX - this.viewOffsetX);
-		const visibleContentEndX = Math.min(this.canvasWidth - this.padding.right, this.contentMaxX - this.viewOffsetX);
-
-		// Clamp the slider's visual X position to the visible content boundaries *for drawing the line only*
-		const indicatorDrawX = p.constrain(this.sliderX, visibleContentStartX, visibleContentEndX);
-
-		// Draw the vertical indicator line between min and max Y at the clamped X position
+		// Draw the vertical indicator line between min and max Y at the slider's X position
 		p.stroke(120, 120, 120, 180); p.strokeWeight(1); p.drawingContext.setLineDash([4, 4]);
 		if (maxY > minY) { // Only draw if there's a valid vertical span
-			p.line(indicatorDrawX, minY, indicatorDrawX, maxY);
+			p.line(this.sliderX, minY, this.sliderX, maxY);
 		}
 		p.drawingContext.setLineDash([]);
 	}
