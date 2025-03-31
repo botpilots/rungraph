@@ -366,6 +366,7 @@ export class GoalGraphRenderer {
 		this.drawVerticalIndicator();
 		this.drawSliderControl();
 		this.drawInfoBox();
+		this.drawLegend();
 	}
 
 	// --- Drawing Helper Functions ---
@@ -524,20 +525,24 @@ export class GoalGraphRenderer {
 
 			// Draw label if point is roughly visible (use a wider visibility check)
 			if (drawX >= visibleLeft - buffer / 2 && drawX <= visibleRight + buffer / 2) {
-				p.noStroke(); p.fill(pointColor); p.textSize(this.pointLabelFontSize);
-				// Fix the regex pattern and ensure we always have a valid label
-				let timeLabel = point.displayTime;
-				// Only try to parse/format if it's not the goal (which might have a different format)
-				if (point.type !== 'goal') {
+				// Only draw labels for TRIAL points now
+				if (point.type === 'trial') {
+					p.noStroke();
+					// Use the point's color for the label text for consistency
+					p.fill(pointColor);
+					p.textSize(this.pointLabelFontSize);
+					// Fix the regex pattern and ensure we always have a valid label
+					let timeLabel = point.displayTime;
+					// Only try to parse/format if it's not the goal (which might have a different format)
 					const match = point.displayTime.match(/^(\d{2}:\d{2}:\d{2})/);
 					if (match && match[1]) {
 						timeLabel = match[1];
 					}
-				}
 
-				// Always position text above the point
-				p.textAlign(p.CENTER, p.BOTTOM);
-				p.text(timeLabel, drawX, point.y - this.pointSize);
+					// Always position text above the point
+					p.textAlign(p.CENTER, p.BOTTOM);
+					p.text(timeLabel, drawX, point.y - this.pointSize);
+				}
 			}
 		});
 	}
@@ -638,6 +643,45 @@ export class GoalGraphRenderer {
 			p.line(lineX, lineYStart, lineX, lineYEnd);
 		}
 		p.pop();
+	}
+
+	// --- Legend ---
+	private drawLegend(): void {
+		const p = this.p;
+		const startPoint = this.points.find(pt => pt.type === 'start');
+		const goalPoint = this.points.find(pt => pt.type === 'goal');
+
+		if (!startPoint || !goalPoint) return; // Don't draw if data isn't ready
+
+		const legendPadding = 15;
+		const markerSize = 8;
+		const lineSpacing = 18;
+		const legendTextSize = 12;
+
+		let currentY = this.padding.top + legendPadding;
+		const legendX = this.canvasWidth - this.padding.right - legendPadding; // Align to right padding
+
+		p.push(); // Isolate legend drawing styles
+
+		p.textSize(legendTextSize);
+		p.textAlign(p.RIGHT, p.CENTER); // Align text to the right of the marker pos
+
+		// Draw Start Point Info
+		p.fill('#2ca02c'); // Start color
+		p.noStroke();
+		p.ellipse(legendX, currentY, markerSize, markerSize); // Marker
+		p.fill(50); // Text color
+		p.text(`Start: ${startPoint.displayTime}`, legendX - markerSize - 5, currentY); // Text to the left
+
+		// Draw Goal Point Info
+		currentY += lineSpacing;
+		p.fill('#d62728'); // Goal color
+		p.noStroke();
+		p.ellipse(legendX, currentY, markerSize, markerSize); // Marker
+		p.fill(50); // Text color
+		p.text(`Goal: ${goalPoint.displayTime}`, legendX - markerSize - 5, currentY); // Text to the left
+
+		p.pop(); // Restore previous drawing styles
 	}
 
 	// --- Info Box (No changes needed here, uses hover state) ---
