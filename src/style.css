@@ -57,7 +57,7 @@ body {
   max-height: 30%;
   min-height: 0;
   overflow-y: auto;
-  background-color: rgba(248, 248, 248, 0.95);
+  background-color: rgba(240, 248, 255, 0.95);
   padding: 12px 15px;
   border-radius: 5px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
@@ -67,10 +67,7 @@ body {
   text-align: left;
   border: 1px solid #eee;
   scrollbar-width: thin;
-  scrollbar-color: #bbb #f8f8f8;
-
-  -webkit-mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
-  mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
+  scrollbar-color: #bbb #f0f8ff;
 }
 
 /* Custom Scrollbar for WebKit browsers */
@@ -79,14 +76,14 @@ body {
 }
 
 #info-box::-webkit-scrollbar-track {
-  background: rgba(248, 248, 248, 0.95);
+  background: rgba(240, 248, 255, 0.95);
   border-radius: 5px;
 }
 
 #info-box::-webkit-scrollbar-thumb {
   background-color: #bbb;
   border-radius: 4px;
-  border: 2px solid rgba(248, 248, 248, 0.95);
+  border: 2px solid rgba(240, 248, 255, 0.95);
 }
 
 #info-box::-webkit-scrollbar-thumb:hover {
