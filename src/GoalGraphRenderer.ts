@@ -82,6 +82,15 @@ export class GoalGraphRenderer {
 	private dragStartOffsetX = 0;
 	private readonly threeWeeksInMillis = 3 * 7 * 24 * 60 * 60 * 1000;
 
+	// Wiggle Animation State
+	private lastWiggleTime = 0;
+	private isWiggling = true;
+	private wiggleStartTime = 0;
+	private readonly wiggleInterval = 8000; // 10 seconds
+	private readonly wiggleDuration = 500; // 0.5 seconds
+	private readonly wiggleAmplitude = 2; // pixels
+	private readonly wiggleCycles = 4; // Number of back-and-forth cycles per animation
+
 	// HTML Element References
 	private infoBoxElement: HTMLElement | null = null;
 	private parentElement: HTMLElement | null = null;
@@ -115,6 +124,7 @@ export class GoalGraphRenderer {
 
 		this.updateDimensionsAndCanvas();
 		this.setupMouseInteraction();
+		this.lastWiggleTime = this.p.millis(); // Initialize wiggle timer
 	}
 
 	// --- Helper for Initial Setup & Resize ---
@@ -582,16 +592,51 @@ export class GoalGraphRenderer {
 		const p = this.p;
 		const trackY = this.sliderTrackY;
 		const sliderKnobY = trackY - this.knobHeight / 2;
+
+		// Wiggle animation logic
+		const currentTime = p.millis();
+		let wiggleOffsetX = 0;
+
+		// Start wiggle?
+		if (!this.isWiggling && !this.isDraggingSlider && currentTime - this.lastWiggleTime > this.wiggleInterval) {
+			this.isWiggling = true;
+			this.wiggleStartTime = currentTime;
+			this.lastWiggleTime = currentTime; // Reset timer immediately
+		}
+
+		// Apply wiggle?
+		if (this.isWiggling) {
+			const wiggleElapsedTime = currentTime - this.wiggleStartTime;
+			if (wiggleElapsedTime < this.wiggleDuration) {
+				// Use a sine wave for smooth oscillation
+				const wiggleProgress = wiggleElapsedTime / this.wiggleDuration; // 0 to 1
+				// Multiplied by 2*PI makes it one full cycle. Multiply by wiggleCycles for desired number.
+				wiggleOffsetX = this.wiggleAmplitude * Math.sin(wiggleProgress * Math.PI * 2 * this.wiggleCycles);
+			} else {
+				this.isWiggling = false; // End wiggle
+				// Ensure lastWiggleTime reflects the end of the *last* wiggle attempt
+				this.lastWiggleTime = currentTime;
+			}
+		}
+
+		// Calculate the draw position including the wiggle offset
+		const drawSliderX = this.sliderX + wiggleOffsetX;
+
 		p.push();
 		if (this.isDraggingSlider) { p.fill(200); p.stroke(50); p.strokeWeight(1.5); }
 		else { p.fill(230); p.stroke(100); p.strokeWeight(1); }
-		p.rect(this.sliderX - this.knobWidth / 2, sliderKnobY, this.knobWidth, this.knobHeight, 3);
+		// Use drawSliderX for drawing the knob
+		p.rect(drawSliderX - this.knobWidth / 2, sliderKnobY, this.knobWidth, this.knobHeight, 3);
 		p.stroke(this.isDraggingSlider ? 50 : 100); p.strokeWeight(1);
 		const lineSpacing = this.knobWidth / 4;
 		const lineHeightRatio = 0.6;
 		const lineYStart = sliderKnobY + this.knobHeight * (1 - lineHeightRatio) / 2;
 		const lineYEnd = sliderKnobY + this.knobHeight * (1 + lineHeightRatio) / 2;
-		for (let i = 1; i <= 3; i++) { const lineX = this.sliderX - this.knobWidth / 2 + i * lineSpacing; p.line(lineX, lineYStart, lineX, lineYEnd); }
+		for (let i = 1; i <= 3; i++) {
+			// Use drawSliderX for drawing the lines inside the knob
+			const lineX = drawSliderX - this.knobWidth / 2 + i * lineSpacing;
+			p.line(lineX, lineYStart, lineX, lineYEnd);
+		}
 		p.pop();
 	}
 
