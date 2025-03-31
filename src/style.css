@@ -40,6 +40,7 @@ body {
   flex-direction: column;
   gap: 15px;
   box-sizing: border-box;
+  align-items: center;
 }
 
 #graph-container {
@@ -58,8 +59,8 @@ body {
   min-height: 0;
   overflow-y: auto;
   background-color: rgba(240, 248, 255, 0.95);
-  padding: 12px 15px;
-  border-radius: 5px;
+  padding: 12px 20px;
+  margin: 0 auto;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   font-size: 12px;
   line-height: 1.5;
@@ -68,6 +69,8 @@ body {
   border: 1px solid #eee;
   scrollbar-width: thin;
   scrollbar-color: #bbb #f0f8ff;
+  box-sizing: border-box;
+  border-radius: 5px;
 }
 
 /* Custom Scrollbar for WebKit browsers */
@@ -113,12 +116,16 @@ canvas {
 @media (max-width: 768px) {
   #app {
     padding: 0.5rem 0;
-    overflow-x: auto;
   }
   
   body, #app, #graph-container {
-    overflow-x: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
+  }
+  
+  #info-box {
+    width: calc(100% - 30px);
+    padding: 12px 15px;
   }
 }
 
