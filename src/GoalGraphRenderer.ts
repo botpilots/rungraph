@@ -1,5 +1,6 @@
 import p5 from 'p5';
-import { StravaActivity } from './types/strava';
+import { SummaryActivity } from './types/strava';
+import { Point, WorkoutColumn } from './types/graphRenderer';
 import {
 	parseTimeToSeconds,
 	formatSecondsToTime,
@@ -9,36 +10,13 @@ import {
 	areDatesInSameWeek
 } from './utils'; // Import helpers
 
-// --- Data Interfaces ---
-
-interface Point {
-	originalX: number; // Calculated during processData based on full timescale
-	currentX: number; // Calculated in draw loop based on originalX and viewOffsetX
-	y: number;
-	date: Date;
-	timeSeconds: number;
-	displayTime: string;
-	type: 'start' | 'trial' | 'goal';
-	activity?: StravaActivity;
-}
-
-interface WorkoutColumn {
-	originalX: number; // Calculated during processData based on full timescale (left edge)
-	currentX: number; // Calculated in draw loop based on originalX and viewOffsetX
-	y: number;
-	width: number;
-	height: number;
-	activity: StravaActivity;
-	date: Date;
-}
-
 // --- Renderer Class ---
 
 export class GoalGraphRenderer {
 	private p: p5;
 	private startData: { currentRaceTime: string; date: Date };
 	private goalData: { targetRaceTime: string; dateOfRace: Date };
-	private activities: StravaActivity[];
+	private activities: SummaryActivity[];
 	private trialDay: string;
 
 	// Canvas and layout properties
@@ -100,7 +78,7 @@ export class GoalGraphRenderer {
 		p: p5,
 		start: { currentRaceTime: string; date: Date },
 		goal: { targetRaceTime: string; dateOfRace: Date },
-		activities: StravaActivity[],
+		activities: SummaryActivity[],
 		parentContainerId: string,
 		trialDay: string = 'sunday'
 	) {
