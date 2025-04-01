@@ -7,6 +7,8 @@ const endDate = new Date('2025-05-17T23:59:59Z');
 const outputFilePath = path.join('data', 'activities.json');
 const athleteId = 135151962; // Use the same athlete ID as in activities.json
 const gearId = "g19030882"; // Use a gear ID, e.g., from existing data
+const randomlyStopEarly = true; // Set to true to enable random early stopping
+const stopEarlyProbability = 0.3; // 10% chance to stop early each week
 
 // --- Helper Functions ---
 
@@ -57,6 +59,12 @@ let currentDate = new Date(startDate);
 let activityIdCounter = generateId(); // Start with a base ID
 
 while (currentDate <= endDate) {
+	// Check for random early stop
+	if (randomlyStopEarly && Math.random() < stopEarlyProbability) {
+		console.log(`\n--- Randomly stopping activity generation early at week starting: ${currentDate.toISOString().slice(0, 10)} ---`);
+		break; // Exit the loop
+	}
+
 	const weekStartDate = new Date(currentDate); // Keep track of the start of the week
 	const weekEndDate = addDays(currentDate, 6);
 	const activitiesThisWeek = getRandomInt(3, 7); // Generate 3 to 7 activities per week
