@@ -1,0 +1,206 @@
+# .github/workflows/fetch_strava_data.yml
+
+# Name of the workflow, displayed in the GitHub Actions UI
+name: Fetch Strava Data
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on a schedule
+  schedule:
+    # Runs every 6 hours (at 00:00, 06:00, 12:00, 18:00 UTC)
+    # You can adjust the cron schedule as needed. Use crontab.guru to help.
+    - cron: '0 */6 * * *'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Defines the jobs that will run in the workflow
+jobs:
+  # The main job for fetching data
+  fetch:
+    # Specifies the runner environment
+    runs-on: ubuntu-latest
+    # Specifies the permissions needed for the GITHUB_TOKEN used by the runner
+    # 'contents: write' is required to allow the job to push changes back to the repository
+    permissions:
+      contents: write
+
+    # Defines the sequence of tasks that will be executed
+    steps:
+      # Step 1: Check out the repository code
+      # This action checks out your repository onto the runner, allowing the workflow
+      # to access its contents (like scripts) and to commit/push changes back.
+      - name: Checkout repository
+        uses: actions/checkout@v4 # It's good practice to use the latest major version
+
+      # Step 2: Refresh Strava token and fetch activities
+      - name: Fetch Strava Data
+        # Define environment variables for sensitive data using GitHub Secrets.
+        # These secrets need to be configured in your repository's Settings > Secrets and variables > Actions.
+        env:
+          # Your Strava application's Client ID
+          STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }} # Placeholder: Replace with your actual Client ID secret name
+          # Your Strava application's Client Secret
+          STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }} # Placeholder: Replace with your actual Client Secret secret name
+          # Your Strava Refresh Token obtained via the initial OAuth flow
+          STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }} # Placeholder: Replace with your actual Refresh Token secret name
+        run: |
+          # Exit immediately if any command fails, preventing subsequent steps from running on error
+          set -e
+
+          # Ensure the 'jq' command-line JSON processor is installed.
+          # It's needed to parse the token response. Ubuntu runners usually have it, but this ensures it.
+          echo "Ensuring jq is installed..."
+          sudo apt-get update && sudo apt-get install -y jq
+
+          echo "Refreshing Strava access token..."
+          # Use curl to make a POST request to Strava's token endpoint to get a new access token.
+          # This uses the long-lived refresh token to obtain a short-lived access token.
+          # The API response (containing the new access_token and possibly a new refresh_token) is saved to token.json
+          curl -X POST https://www.strava.com/api/v3/oauth/token \
+            -d client_id=$STRAVA_CLIENT_ID \
+            -d client_secret=$STRAVA_CLIENT_SECRET \
+            -d refresh_token=$STRAVA_REFRESH_TOKEN \
+            -d grant_type=refresh_token \
+            -o token.json \
+            --fail # Make curl exit with an error if the HTTP request fails (e.g., 4xx, 5xx)
+
+          # Extract the access token from the JSON response using jq.
+          # The '-r' flag outputs the raw string value without quotes.
+          ACCESS_TOKEN=$(jq -r .access_token token.json)
+
+          # Check if the ACCESS_TOKEN was successfully extracted. If not, print an error and exit.
+          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" == "null" ]; then
+            echo "Error: Failed to extract access token from token.json."
+            echo "Token response:"
+            cat token.json # Display the token response for debugging (consider security implications if logs are public)
+            exit 1
+          fi
+          echo "Access token refreshed successfully."
+
+          # Optional: Consider saving the potentially new refresh token from token.json back to secrets if needed.
+          # Strava refresh tokens *can* change, although it's not guaranteed on every refresh.
+          # Handling this requires more advanced logic (e.g., using the GitHub API to update secrets).
+
+          # Ensure the data directory exists before saving the file
+          mkdir -p data
+
+          echo "Fetching Strava activities..."
+          # Use curl to make a GET request to the Strava API's activities endpoint.
+          # Include the obtained access token in the Authorization header (Bearer token).
+          # Fetches the most recent activities (default is 30 per page). Adjust 'per_page' as needed (max 200).
+          # The response (a JSON array of activities) is saved to data/activities.json
+          # You could add query parameters like 'before', 'after', 'page' if needed:
+          # e.g., "https://www.strava.com/api/v3/athlete/activities?per_page=50&after=<timestamp>"
+          curl -X GET "https://www.strava.com/api/v3/athlete/activities?per_page=30" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -o data/activities.json \
+            --fail # Make curl exit with an error if the HTTP request fails
+
+          echo "Strava data fetched successfully and saved to data/activities.json"
+
+      # Step 3: Commit and push the updated data file if changes exist
+      - name: Commit and Push Strava Data
+        id: commit_push # Give this step an ID to access its outputs if needed
+        run: |
+          set -e # Ensure script exits on error
+          echo "Configuring Git..."
+          # Configure Git with bot credentials for the commit.
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          FETCH_TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          LOG_FILE="data/fetch_log.txt"
+          DATA_FILE="data/activities.json"
+          CHECKSUM_FILE="data/last_checksum.txt"
+          NEW_CHECKSUM=""
+          PREV_CHECKSUM=""
+          STATUS="Success"
+          DATA_CHANGED="No"
+          ERROR_MSG=""
+
+          # Ensure log directory exists
+          mkdir -p data
+
+          # Check if data file was actually created (covers fetch errors where file might be missing)
+          if [ ! -f "$DATA_FILE" ]; then
+            STATUS="Failure"
+            ERROR_MSG="${DATA_FILE} not found after fetch step."
+            echo "Error: ${ERROR_MSG}" >&2 # Print error to stderr
+            # Log failure immediately and exit script, no commit happens
+            echo "$FETCH_TIMESTAMP | $STATUS | Error: $ERROR_MSG" >> "$LOG_FILE"
+            exit 1 # Ensure workflow step shows failure
+          fi
+
+          echo "Calculating checksums..."
+          # Calculate checksum of the new data file
+          # Using md5sum here, sha1sum or others could also be used
+          if command -v md5sum &> /dev/null; then
+            NEW_CHECKSUM=$(md5sum "$DATA_FILE" | awk '{ print $1 }')
+          elif command -v md5 &> /dev/null; then # macOS fallback
+            NEW_CHECKSUM=$(md5 -q "$DATA_FILE")
+          else
+             echo "Warning: No checksum utility (md5sum/md5) found. Cannot track data changes accurately." >&2
+             NEW_CHECKSUM="unknown"
+          fi
+
+          # Read the previous checksum if the file exists
+          if [ -f "$CHECKSUM_FILE" ]; then
+            PREV_CHECKSUM=$(cat "$CHECKSUM_FILE")
+          else
+            PREV_CHECKSUM="none"
+          fi
+
+          echo "New checksum: $NEW_CHECKSUM"
+          echo "Previous checksum: $PREV_CHECKSUM"
+
+          # Determine if data has changed (only if checksums are known)
+          if [ "$NEW_CHECKSUM" != "unknown" ] && [ "$PREV_CHECKSUM" != "$NEW_CHECKSUM" ]; then
+            DATA_CHANGED="Yes"
+            echo "Data has changed."
+          else
+            echo "No change detected in data based on checksum."
+          fi
+
+          # Stage the data file for commit check
+          git add "$DATA_FILE"
+
+          # Check if there are staged changes for the data file.
+          if ! git diff --staged --quiet -- "$DATA_FILE"; then
+            echo "Detected changes in ${DATA_FILE} via git diff."
+            # Ensure DATA_CHANGED reflects git's view if checksum failed or was same but git sees changes (e.g. line endings)
+            if [ "$DATA_CHANGED" == "No" ]; then
+                echo "Checksum indicated no change, but git detected changes. Marking as changed."
+                DATA_CHANGED="Yes"
+            fi
+          else
+            echo "No changes in ${DATA_FILE} to commit based on git diff."
+            # If git sees no changes, override DATA_CHANGED to No
+            DATA_CHANGED="No"
+          fi
+
+          # Log the outcome
+          echo "Logging fetch result to $LOG_FILE..."
+          echo "$FETCH_TIMESTAMP | $STATUS | New Checksum: $NEW_CHECKSUM | Prev Checksum: $PREV_CHECKSUM | Data Changed: $DATA_CHANGED" >> "$LOG_FILE"
+
+          # Stage the log file and the checksum file
+          git add "$LOG_FILE"
+          # Always update the checksum file with the latest checksum
+          echo "$NEW_CHECKSUM" > "$CHECKSUM_FILE"
+          git add "$CHECKSUM_FILE"
+
+          # Commit ONLY if the data file actually changed OR if the log file changed (it always will)
+          # We check staged changes across all relevant files now
+          echo "Checking for overall staged changes..."
+          if ! git diff --staged --quiet; then
+            echo "Staged changes detected (log, checksum, or data). Committing..."
+            COMMIT_MSG="Update Strava data and log ($FETCH_TIMESTAMP)"
+            if [ "$DATA_CHANGED" == "No" ]; then
+              COMMIT_MSG="Update Strava fetch log ($FETCH_TIMESTAMP) - No data change"
+            fi
+            git commit -m "$COMMIT_MSG"
+
+            echo "Pushing changes..."
+            git push
+          else
+            echo "No overall changes staged (log, checksum, data). Nothing to commit or push."
+          fi

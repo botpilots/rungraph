@@ -1,4 +1,4 @@
-import { StravaActivity } from './types/strava';
+import { SummaryActivity } from './types/strava';
 
 // --- Time/Date Helper Functions ---
 
@@ -56,10 +56,10 @@ export const areDatesInSameWeek = (date1: Date, date2: Date): boolean => {
 
 let activityIdCounter = 0;
 
-/** Generates a sample StravaActivity object with defaults */
+/** Generates a sample SummaryActivity object with defaults */
 export const generateSampleActivity = (
-	overrides: Partial<StravaActivity> & { start_date_local: string; moving_time: number } // Ensure required fields are passed
-): StravaActivity => {
+	overrides: Partial<SummaryActivity> & { start_date_local: string; moving_time: number } // Ensure required fields are passed
+): SummaryActivity => {
 	activityIdCounter++;
 	return {
 		id: activityIdCounter,
@@ -80,11 +80,11 @@ export const generateSampleData = (year: number = 2025) => { // Assuming 2025 ba
 	};
 
 	const goal = {
-		targetRaceTime: "01:10:00 HM",
+		targetRaceTime: "01:10:00",
 		dateOfRace: new Date(`${year}-05-17T09:00:00Z`), // Sat 17 May (guessing race day is Sat)
 	};
 
-	const activities: StravaActivity[] = [];
+	const activities: SummaryActivity[] = [];
 
 	// Trial Points (Sundays from image)
 	const trials = [

@@ -2,91 +2,140 @@ import './style.css'
 import p5 from 'p5'
 import { GoalGraphRenderer } from './GoalGraphRenderer'
 import { generateSampleData } from './utils'
-import { fetchStravaActivities, StravaSummaryActivity } from './stravaApi' // Import the new function and type
+// Removed: import { fetchStravaActivities } from './stravaApi'
+import { StartData, GoalData } from './types/common'
+import { SummaryActivity, SportType, ActivityType } from './types/strava'; // Import needed types
 
 // --- Configuration ---
-const useLiveData = true; // Switch between test data and live Strava data
-// IMPORTANT: Replace with your actual Strava Access Token obtained via OAuth
-// You'll need to implement the OAuth flow separately to get this token dynamically.
-// See: https://developers.strava.com/docs/authentication/
-const STRAVA_ACCESS_TOKEN = '1d5f746520344484ff17e38a2a5fdf11c39f4d33'; // <--- PUT YOUR TOKEN HERE (or manage securely)
-const WEEKS_TO_FETCH = 3; // How many weeks of data to fetch for live mode (adjust as needed)
+const useLiveData = false; // Default to using mock data for easier local dev
 // --- End Configuration ---
 
-// Function to adapt Strava activities to the format expected by GoalGraphRenderer (if needed)
-// For now, we assume GoalGraphRenderer expects something similar to StravaSummaryActivity or the sample data structure.
-// You might need to adjust this function based on GoalGraphRenderer's requirements.
-function adaptStravaData(stravaActivities: StravaSummaryActivity[]): any[] {
-	console.log("Adapting Strava data...", stravaActivities);
-	// Example adaptation: Ensure date format, potentially calculate required fields
-	// This is a placeholder - adjust based on what GoalGraphRenderer needs vs what Strava provides
-	return stravaActivities.map(activity => ({
-		...activity, // Keep original fields
-		date: activity.start_date_local.split('T')[0], // Extract YYYY-MM-DD
-		// Add any other transformations needed by GoalGraphRenderer
-		// e.g., convert units if necessary
-	}));
-}
-
+// --- Mock Data Definition ---
+// Create a few mock activities adhering to the SummaryActivity structure
+const mockActivities: SummaryActivity[] = [
+	{
+		id: 1,
+		external_id: "mock-1",
+		upload_id: 101,
+		athlete: { id: 12345 },
+		name: "Morning Mock Run",
+		distance: 5035, // meters
+		moving_time: 1812, // seconds (30:12)
+		elapsed_time: 1850,
+		total_elevation_gain: 55,
+		elev_high: 100,
+		elev_low: 45,
+		type: ActivityType.Run, // Deprecated, but use for consistency if needed
+		sport_type: SportType.Run,
+		start_date: new Date("2024-05-01T07:00:00Z"),
+		start_date_local: new Date("2024-05-01T09:00:00"), // Example local time
+		timezone: "(GMT+01:00) Europe/London",
+		start_latlng: [51.5, -0.1],
+		end_latlng: [51.5, -0.12],
+		achievement_count: 2,
+		kudos_count: 5,
+		comment_count: 0,
+		athlete_count: 1,
+		photo_count: 0,
+		total_photo_count: 0,
+		map: { id: "map1", polyline: "", summary_polyline: "_p~iF~ps|U_..." }, // Add placeholder polyline
+		trainer: false,
+		commute: false,
+		manual: false,
+		private: false,
+		flagged: false,
+		workout_type: 0, // 0: Default run, 1: Race, 2: Long Run, 3: Workout
+		upload_id_str: "101",
+		average_speed: 2.77, // m/s
+		max_speed: 3.5,
+		has_kudoed: false,
+		hide_from_home: false,
+		gear_id: "g123",
+		kilojoules: 0,
+		average_watts: 0,
+		device_watts: false,
+		max_watts: 0,
+		weighted_average_watts: 0
+	},
+	{
+		id: 2,
+		external_id: "mock-2",
+		upload_id: 102,
+		athlete: { id: 12345 },
+		name: "Lunchtime Walk",
+		distance: 2100,
+		moving_time: 1500, // seconds (25:00)
+		elapsed_time: 1520,
+		total_elevation_gain: 15,
+		elev_high: 60,
+		elev_low: 45,
+		type: ActivityType.Walk,
+		sport_type: SportType.Walk,
+		start_date: new Date("2024-05-03T12:30:00Z"),
+		start_date_local: new Date("2024-05-03T13:30:00"),
+		timezone: "(GMT+01:00) Europe/London",
+		start_latlng: [51.51, -0.11],
+		end_latlng: [51.51, -0.1],
+		achievement_count: 0,
+		kudos_count: 2,
+		comment_count: 1,
+		athlete_count: 1,
+		photo_count: 0,
+		total_photo_count: 0,
+		map: { id: "map2", polyline: "", summary_polyline: "_p~iF~ps|V_..." },
+		trainer: false,
+		commute: true,
+		manual: false,
+		private: false,
+		flagged: false,
+		workout_type: 0, // Workout type might be null in API, but type expects number. Use 0 for default.
+		upload_id_str: "102",
+		average_speed: 1.4,
+		max_speed: 1.8,
+		has_kudoed: true,
+		hide_from_home: false,
+		gear_id: "", // Gear ID might be null in API, but type expects string. Use "" for none.
+		kilojoules: 0,
+		average_watts: 0,
+		device_watts: false,
+		max_watts: 0,
+		weighted_average_watts: 0
+	},
+	// Add more mock activities as needed...
+];
+// --- End Mock Data ---
 
 // Main asynchronous function to initialize the application
 async function initializeApp() {
-	let activities: any[]; // Use 'any[]' for flexibility or a more specific type if defined
-
-	// Update type definitions to match what GoalGraphRenderer expects
-	interface StartData {
-		currentRaceTime: string;
-		date: Date;
-	}
-
-	interface GoalData {
-		targetRaceTime: string;
-		dateOfRace: Date;
-	}
+	let activities: SummaryActivity[]; // Use the specific type from Strava types
 
 	let start: StartData;
 	let goal: GoalData;
 
 	try {
 		if (useLiveData) {
-			if (!STRAVA_ACCESS_TOKEN || STRAVA_ACCESS_TOKEN === 'YOUR_STRAVA_ACCESS_TOKEN_HERE') {
-				console.error("Strava Access Token is missing or not replaced. Please add it to main.ts.");
-				alert("Strava Access Token is missing. Please configure it in main.ts to use live data.");
-				// Fallback to sample data or stop execution
-				const sampleData = generateSampleData();
-				activities = sampleData.activities;
-				start = sampleData.start;
-				goal = sampleData.goal;
-				console.warn("Falling back to sample data due to missing Strava token.");
-			} else {
-				console.log("Fetching live data from Strava...");
-				const now = new Date();
-				const afterTimestamp = Math.floor(now.setDate(now.getDate() - WEEKS_TO_FETCH * 7) / 1000);
+			console.log("Fetching activity data from static file...");
+			// Construct the URL using Vite's base URL environment variable
+			// This ensures the correct path in both development (/) and production (/rungraph/)
+			const dataUrl = `${import.meta.env.BASE_URL}data/activities.json`;
+			console.log(`Attempting to fetch data from: ${dataUrl}`)
 
-				// Fetch activities from the last N weeks
-				const rawStravaActivities = await fetchStravaActivities(
-					STRAVA_ACCESS_TOKEN,
-					undefined, // 'before' timestamp - not needed if fetching recent data
-					afterTimestamp, // 'after' timestamp - fetch activities since N weeks ago
-					1, // page number
-					200 // Fetch up to 200 activities per page (max allowed)
-				);
-				activities = adaptStravaData(rawStravaActivities);
-
-				// TODO: Determine 'start' and 'goal' based on live data or keep static ones
-				// For now, using static start/goal from sample data generation context
-				const sampleData = generateSampleData(); // Use this just for start/goal for now
-				start = sampleData.start;
-				goal = sampleData.goal;
-				console.log("Live Strava data fetched and adapted.");
+			const response = await fetch(dataUrl);
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status} while fetching ${dataUrl}`);
 			}
+			activities = await response.json();
+			console.log(`Successfully loaded ${activities.length} activities from ${dataUrl}`);
 		} else {
-			console.log("Using generated sample data.");
-			const sampleData = generateSampleData();
-			activities = sampleData.activities;
-			start = sampleData.start;
-			goal = sampleData.goal;
+			console.log("Using mock activity data.");
+			activities = mockActivities;
 		}
+
+		// TODO: Determine 'start' and 'goal' properly.
+		// Using sample data generation just for start/goal for now:
+		const sampleData = generateSampleData();
+		start = sampleData.start;
+		goal = sampleData.goal;
 
 		// --- Initialize p5 Sketch AFTER data is ready ---
 
@@ -150,7 +199,10 @@ async function initializeApp() {
                 <h2>Error Initializing Application</h2>
                 <p>Could not load activity data. Please check the console for details.</p>
                 <pre>${error instanceof Error ? error.message : String(error)}</pre>
-                ${useLiveData ? '<p>If using live data, ensure your Strava Access Token is correct and you have an internet connection.</p>' : ''}
+                ${useLiveData
+				? "<p>Ensure the file 'data/activities.json' exists and is accessible.</p>"
+				: "<p>Error occurred while using mock data.</p>"
+			}
             </div>
         `;
 	}
