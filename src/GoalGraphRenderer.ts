@@ -252,7 +252,7 @@ export class GoalGraphRenderer {
 			if (activityDate < startDate || activityDate > goalDate) return;
 
 			const isValidTime = typeof activity.moving_time === 'number' && activity.moving_time > 0;
-			const isTrial = getDayOfWeek(activityDate) === this.trialDay || activity.type?.toLowerCase() === 'race';
+			const isTrial = getDayOfWeek(activityDate) === this.trialDay || activity.workout_type === 1;
 			const activityOriginalX = mapTimeToX(activityDate);
 
 			if (isTrial && isValidTime) {
@@ -770,8 +770,6 @@ export class GoalGraphRenderer {
 				const paceSeconds = Math.floor(paceSecondsPerKm % 60);
 				infoText.push(`Pace: ${paceMinutes}:${String(paceSeconds).padStart(2, '0')} /km`);
 			} else { infoText.push(`Pace: N/A`); }
-			if (activity.average_heartrate) { infoText.push(`Avg HR: ${activity.average_heartrate.toFixed(0)} bpm`); }
-			if (activity.suffer_score) { infoText.push(`Suffer Score: ${activity.suffer_score}`); }
 		} else {
 			infoText.push("Move the slider over points or workout bars to see details.");
 		}
