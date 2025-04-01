@@ -13,12 +13,12 @@ async function initializeApp() {
 
 	// --- Start and goal configuration ---
 	start = {
-		date: new Date('2024-03-31'), // Start date
+		date: new Date('2025-03-31'), // Start date
 		currentRaceTime: "01:31:00", // Example 10k race time (mm:ss)
 	};
 
 	goal = {
-		dateOfRace: new Date('2024-12-31'), // Date of goal race
+		dateOfRace: new Date('2025-05-17'), // Date of goal race
 		targetRaceTime: "01:10:00", // Example target 10k race time (mm:ss)
 	};
 	// --- End start and goal configuration ---
