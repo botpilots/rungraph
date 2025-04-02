@@ -285,6 +285,7 @@ export class GoalGraphRenderer {
 
 		let firstWeekStartChecked = false;
 		const startWeekBeginning = getStartOfWeek(startDate); // Assumes getStartOfWeek exists and works
+		let displayedWeekCounter = 2; // Initialize counter for displayed week numbers
 
 		while (currentWeekStart.getTime() <= goalDateMs) {
 			const currentWeekStartMs = currentWeekStart.getTime();
@@ -300,18 +301,15 @@ export class GoalGraphRenderer {
 				}
 			}
 
-			// Calculate week number relative to the start date's week
-			const pointWeekBeginning = getStartOfWeek(currentWeekStart);
-			const weekDiffMillis = pointWeekBeginning.getTime() - startWeekBeginning.getTime();
-			const weekNumber = Math.max(1, Math.floor(weekDiffMillis / (7 * 24 * 60 * 60 * 1000) + 0.5) + 1);
-
-			// Add the marker
+			// Add the marker using the sequential counter
 			this.weekMarkers.push({
 				date: new Date(currentWeekStart), // Store a copy
 				originalX: mapTimeToX(currentWeekStart), // Map week start date
 				currentX: 0, // Will be updated in draw loop
-				weekNumber: weekNumber,
+				weekNumber: displayedWeekCounter, // Assign sequential number starting from 2
 			});
+
+			displayedWeekCounter++; // Increment for the next marker
 
 			// Move to the next week start day
 			currentWeekStart.setDate(currentWeekStart.getDate() + 7);
