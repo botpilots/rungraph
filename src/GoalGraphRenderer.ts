@@ -375,24 +375,33 @@ export class GoalGraphRenderer {
 			if (activityDate < startDate || activityDate > goalDate) return;
 
 			const isValidTime = typeof activity.moving_time === 'number' && activity.moving_time > 0;
-			const isTrial = getDayOfWeek(activityDate) === this.trialDay || activity.workout_type === 1;
+
+			// If not valid time, skip and give a console warning.
+			if (!isValidTime) {
+				console.warn(`Invalid time for activity ${activity.name} on ${activityDate}`);
+				return;
+			}
+
+			const isTrial = activity.workout_type === 1;
 			const activityOriginalX = mapTimeToX(activityDate);
 
-			if (isTrial && isValidTime) {
+			// Display points for trials only.
+			if (isTrial) {
 				this.points.push({
 					originalX: mapPointTimeToX(activityDate),
 					currentX: 0, y: 0, date: activityDate, timeSeconds: activity.moving_time,
 					displayTime: formatSecondsToTime(activity.moving_time), type: 'trial',
 					activity: activity,
 				});
-			} else if (isValidTime) {
-				// Set column width to represent a full day
-				this.workoutColumns.push({
-					originalX: activityOriginalX - (dayWidth / 2), // Center the column on the activity date
-					currentX: 0, y: 0, width: dayWidth, height: 0,
-					activity: activity, date: activityDate,
-				});
 			}
+
+			// Display columns for all activities, including trials.
+			// Column width represents a full day.
+			this.workoutColumns.push({
+				originalX: activityOriginalX - (dayWidth / 2), // Center the column on the activity date
+				currentX: 0, y: 0, width: dayWidth, height: 0,
+				activity: activity, date: activityDate,
+			});
 		});
 
 		this.points.sort((a, b) => a.date.getTime() - b.date.getTime());
