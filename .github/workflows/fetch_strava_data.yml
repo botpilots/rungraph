@@ -91,7 +91,7 @@ jobs:
           # The response (a JSON array of activities) is saved to data/activities.json
           # You could add query parameters like 'before', 'after', 'page' if needed:
           # e.g., "https://www.strava.com/api/v3/athlete/activities?per_page=50&after=<timestamp>"
-          curl -X GET "https://www.strava.com/api/v3/athlete/activities?per_page=30" \
+          curl -X GET "https://www.strava.com/api/v3/athlete/activities?per_page=200" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -o data/activities.json \
             --fail # Make curl exit with an error if the HTTP request fails

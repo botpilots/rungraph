@@ -15,40 +15,11 @@ A visualization tool for running activities data, built with Vite, TypeScript, a
    npm install
    ```
 
-3. Create a `.env` file in the root directory with your Strava API token
-   ```
-   VITE_STRAVA_ACCESS_TOKEN=your_strava_access_token_here
-   ```
-
 4. Start the development server
    ```bash
    npm run dev
    ```
 
-## Deployment to GitHub Pages
-
-This project is configured to automatically deploy to GitHub Pages using GitHub Actions when you push to the main branch.
-
-### Setting up GitHub Secrets
-
-For the deployment to work with Strava API integration, you need to set up a repository secret:
-
-1. Go to your GitHub repository
-2. Navigate to Settings > Secrets and variables > Actions
-3. Click "New repository secret"
-4. Add a secret with the name `VITE_STRAVA_ACCESS_TOKEN` and your Strava API token as the value
-5. Click "Add secret"
-
-### Manual Deployment
-
-If you want to deploy manually:
-
-1. Build the project
-   ```bash
-   npm run build
-   ```
-
-2. Deploy the `dist` folder to GitHub Pages or any other static hosting service
 
 ## Automated Strava Data Fetching
 
@@ -134,11 +105,9 @@ This project utilizes two separate GitHub Actions workflows found in `.github/wo
 **How they work together:**
 
 The data fetching workflow ensures the `data/activities.json` file in your repository is kept up-to-date with recent Strava activities. When you push code changes (or when the data fetch workflow pushes data updates) to the `main` branch, the deployment workflow rebuilds and redeploys your frontend application. The deployed application should be configured to simply read the static `data/activities.json` file included in its build, rather than making live calls to the Strava API itself.
-
-*(Note: The current `deploy.yml` injects `VITE_STRAVA_ACCESS_TOKEN` during the build. This is likely unnecessary and potentially insecure if the frontend reads data from the static JSON file, as recommended. Consider removing the `env:` block from the build step in `deploy.yml` if your frontend loads data locally.)*
-
+ð
 ## Configuration
 
 - The Vite configuration in `vite.config.js` includes the base path for GitHub Pages deployment (`/rungraph/`)
 - Environment variables used in the client-side application must be prefixed with `VITE_` (defined in `.env`).
-- Access environment variables in code using: `import.meta.env.VITE_VARIABLE_NAME`
+- Access environment variables in code using: `import.meta.env.VITE_VARIABLE_NAME` (not recommended for sensitive data)
