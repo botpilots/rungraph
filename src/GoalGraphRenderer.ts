@@ -383,7 +383,6 @@ export class GoalGraphRenderer {
 			}
 
 			const isTrial = activity.workout_type === 1;
-			const activityOriginalX = mapTimeToX(activityDate);
 
 			// Display points for trials only.
 			if (isTrial) {
@@ -396,9 +395,13 @@ export class GoalGraphRenderer {
 			}
 
 			// Display columns for all activities, including trials.
-			// Column width represents a full day.
+			// Calculate position based on the START of the day.
+			const startOfDayDate = new Date(activityDate);
+			startOfDayDate.setHours(0, 0, 0, 0); // Set to beginning of the day
+			const columnStartX = mapTimeToX(startOfDayDate); // Get X position for 00:00:00
+
 			this.workoutColumns.push({
-				originalX: activityOriginalX - (dayWidth / 2), // Center the column on the activity date
+				originalX: columnStartX, // Use the calculated start-of-day X
 				currentX: 0, y: 0, width: dayWidth, height: 0,
 				activity: activity, date: activityDate,
 			});
