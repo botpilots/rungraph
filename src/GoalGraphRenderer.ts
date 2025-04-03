@@ -914,90 +914,74 @@ export class GoalGraphRenderer {
 			return;
 		}
 
-		// Helper function to format time (HH:MM)
-		const formatStartTime = (date: Date): string => {
-			const hours = String(date.getHours()).padStart(2, '0');
-			const minutes = String(date.getMinutes()).padStart(2, '0');
-			return `${hours}:${minutes}`;
-		};
-
-		let infoHTML = '';
-
+		let infoText: string[] = [];
 		if (this.hoveredItems.length > 0) {
 			this.hoveredItems.forEach((item, index) => {
 				if (index > 0) {
-					infoHTML += '<hr>';
+					infoText.push(''); // Add a separator (<hr>) between items
 				}
+				// Helper function to format time (HH:MM)
+				const formatStartTime = (date: Date): string => {
+					const hours = String(date.getHours()).padStart(2, '0');
+					const minutes = String(date.getMinutes()).padStart(2, '0');
+					return `${hours}:${minutes}`;
+				};
 
 				// Use property checking for interfaces
 				if ('type' in item) {
 					// --- Point ---
 					const point = item as Point; // Cast for type safety
-					const pointTitle = point.type.charAt(0).toUpperCase() + point.type.slice(1);
-					const pointDate = point.date.toLocaleDateString('en-CA');
-
-					infoHTML += `
-						<p><strong>${pointTitle} Point</strong></p>
-						<p>Date: ${pointDate}</p>
-					`;
+					infoText.push(`<strong>${point.type.charAt(0).toUpperCase() + point.type.slice(1)} Point</strong>`);
+					infoText.push(`Date: ${point.date.toLocaleDateString('en-CA')}`); // Keep date for all points
 
 					if (point.activity) { // This covers 'trial' points with associated activity
+						infoText.push(`Activity: ${point.activity.name}`);
+						// Add Start Time for Trials
 						const activityDate = new Date(point.activity.start_date_local);
-						const distance = typeof point.activity.distance === 'number'
-							? `<p>Distance: ${(point.activity.distance / 1000).toFixed(1)} km</p>`
-							: '';
-
-						infoHTML += `
-							<p>Activity: ${point.activity.name}</p>
-							<p>Start Time: ${formatStartTime(activityDate)}</p>
-							<p>Result Time: ${point.displayTime}</p>
-							${distance}
-						`;
+						infoText.push(`Start Time: ${formatStartTime(activityDate)}`);
+						infoText.push(`Result Time: ${point.displayTime}`); // Label clarifies this is the trial result
+						if (typeof point.activity.distance === 'number') {
+							infoText.push(`Distance: ${(point.activity.distance / 1000).toFixed(1)} km`);
+						}
 					} else if (point.type === 'start') {
-						infoHTML += `<p>Starting Time: ${point.displayTime}</p>`;
+						infoText.push(`Starting Time: ${point.displayTime}`); // Keep original time display for start
 					} else if (point.type === 'goal') {
-						infoHTML += `<p>Target Time: ${point.displayTime}</p>`;
+						infoText.push(`Target Time: ${point.displayTime}`); // Keep original time display for goal
+						// Goal point date is already shown, specific start time of day isn't available/relevant here.
 					}
 				} else if ('height' in item && !this.hoveredItems.some(hoveredItem =>
 					'type' in hoveredItem &&
 					hoveredItem.type === 'trial' &&
 					hoveredItem.activity?.id === item.activity.id)) {
 					// --- WorkoutColumn ---
-					const column = item as WorkoutColumn;
+					const column = item as WorkoutColumn; // Cast for type safety
 					const activity = column.activity;
 					const activityDate = new Date(activity.start_date_local);
-
-					// Calculate pace
+					infoText.push(`<strong>Workout: ${activity.name}</strong>`);
+					infoText.push(`Date: ${activityDate.toLocaleDateString('en-CA')}`);
+					// Add Start Time for Workouts
+					infoText.push(`Start Time: ${formatStartTime(activityDate)}`);
+					infoText.push(`Dist: ${(activity.distance / 1000).toFixed(2)} km`);
+					// Change label to Duration for moving_time
+					infoText.push(`Duration: ${formatSecondsToTime(activity.moving_time)}`);
 					const paceSecondsPerKm = activity.distance > 0 ? (activity.moving_time / (activity.distance / 1000)) : 0;
-					let paceText = 'N/A';
 					if (paceSecondsPerKm > 0) {
 						const paceMinutes = Math.floor(paceSecondsPerKm / 60);
 						const paceSeconds = Math.floor(paceSecondsPerKm % 60);
-						paceText = `${paceMinutes}:${String(paceSeconds).padStart(2, '0')} /km`;
-					}
-
-					infoHTML += `
-						<p><strong>Workout: ${activity.name}</strong></p>
-						<p>Date: ${activityDate.toLocaleDateString('en-CA')}</p>
-						<p>Start Time: ${formatStartTime(activityDate)}</p>
-						<p>Dist: ${(activity.distance / 1000).toFixed(2)} km</p>
-						<p>Duration: ${formatSecondsToTime(activity.moving_time)}</p>
-						<p>Pace: ${paceText}</p>
-					`;
+						infoText.push(`Pace: ${paceMinutes}:${String(paceSeconds).padStart(2, '0')} /km`);
+					} else { infoText.push(`Pace: N/A`); }
 				} else if ('weekNumber' in item) {
-					// --- WeekMarker ---
-					const marker = item as WeekMarker;
-
-					infoHTML += `
-						<p><strong>Week ${marker.weekNumber} Start</strong></p>
-						<p>${marker.date.toLocaleDateString('en-CA')}</p>
-					`;
+					// --- WeekMarker --- (Add logic to display week marker info)
+					const marker = item as WeekMarker; // Cast for type safety
+					infoText.push(`<strong>Week ${marker.weekNumber} Start</strong>`);
+					infoText.push(`${marker.date.toLocaleDateString('en-CA')}`);
+					// Add more relevant info for week markers if needed, e.g., weekly summary
 				}
 			});
 		} else {
-			infoHTML = '<p>Move the slider over the graph to see details.</p>';
+			infoText.push("Move the slider over the graph to see details."); // Updated default message
 		}
-
+		const infoHTML = infoText.map(line => line === '' ? '<hr>' : `<p>${line}</p>`).join('');
 		this.infoBoxElement.innerHTML = infoHTML;
 	}
 
