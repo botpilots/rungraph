@@ -66,7 +66,7 @@ async function initializeApp() {
 			p.setup = () => {
 				p.textFont('Arial');
 				// Pass the fetched/generated data to the renderer
-				renderer = new GoalGraphRenderer(p, start, goal, activities, 'graph-container', 'sunday');
+				renderer = new GoalGraphRenderer(p, start, goal, activities, 'graph-container');
 				if (renderer) {
 					renderer.windowResized();
 				} else {

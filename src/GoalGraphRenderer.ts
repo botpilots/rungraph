@@ -4,11 +4,10 @@ import { Point, WorkoutColumn, WeekMarker } from './types/graphRenderer';
 import {
 	parseTimeToSeconds,
 	formatSecondsToTime,
-	getDayOfWeek,
-	getStartOfWeek,
-	isDateInPreviousWeek,
-	areDatesInSameWeek
-} from './utils'; // Import helpers
+
+	areDatesInSameWeek,
+	isDateInPreviousWeek
+} from './utils'; // Removed getDayOfWeek
 
 // --- Renderer Class ---
 
@@ -17,7 +16,6 @@ export class GoalGraphRenderer {
 	private startData: { currentRaceTime: string; date: Date };
 	private goalData: { targetRaceTime: string; dateOfRace: Date };
 	private activities: SummaryActivity[];
-	private trialDay: string;
 
 	// Week configuration
 	private weekStartDay: number = 1; // Default: Monday (0=Sun, 1=Mon, ..., 6=Sat)
@@ -84,14 +82,13 @@ export class GoalGraphRenderer {
 		goal: { targetRaceTime: string; dateOfRace: Date },
 		activities: SummaryActivity[],
 		parentContainerId: string,
-		trialDay: string = 'sunday',
+		// trialDay: string = 'sunday', // Removed trialDay parameter, can be used as indication of trial day perhaps going forward.
 		weekStartDay: number = 1 // Default: Monday
 	) {
 		this.p = p;
 		this.startData = start;
 		this.goalData = goal;
 		this.activities = activities;
-		this.trialDay = trialDay.toLowerCase();
 		this.weekStartDay = weekStartDay;
 		this.parentElement = document.getElementById(parentContainerId);
 		this.viewToggleCheckbox = document.getElementById('view-toggle-checkbox') as HTMLInputElement;
@@ -280,7 +277,6 @@ export class GoalGraphRenderer {
 		currentWeekStart.setHours(0, 0, 0, 0); // Normalize to start of day
 
 		let firstWeekStartChecked = false;
-		const startWeekBeginning = getStartOfWeek(startDate); // Assumes getStartOfWeek exists and works
 		let displayedWeekCounter = 2; // Initialize counter for displayed week numbers
 
 		while (currentWeekStart.getTime() <= goalDateMs) {
@@ -517,7 +513,6 @@ export class GoalGraphRenderer {
 		let connectingLineLength = 10; // Length of the small line connecting tilted labels
 		let tiltedLabelOffsetX = -5; // Horizontal offset for tilted labels
 		let tiltedLabelOffsetY = 15; // Vertical offset specifically for tilted labels
-		const markerHoverRadius = 5; // Interaction radius for week markers
 
 		p.fill(150); // Use gray for all text labels
 		p.stroke(150); // Use gray for lines
@@ -639,7 +634,7 @@ export class GoalGraphRenderer {
 		const sortedColumns = [...this.workoutColumns].sort((a, b) => a.date.getTime() - b.date.getTime());
 		const hoveredItemsSet = new Set(this.hoveredItems);
 
-		sortedColumns.forEach((col, index) => {
+		sortedColumns.forEach((col) => {
 			const drawX = col.currentX;
 			if (drawX + col.width < visibleLeft - buffer || drawX > visibleRight + buffer) return; // Clipping
 
@@ -708,7 +703,6 @@ export class GoalGraphRenderer {
 
 	private drawPoints(visibleLeft: number, visibleRight: number, buffer: number): void {
 		const p = this.p;
-		const hoverRadius = this.pointSize / 2;
 		const hoveredItemsSet = new Set(this.hoveredItems);
 
 		this.points.forEach(point => {
@@ -761,9 +755,6 @@ export class GoalGraphRenderer {
 	private drawVerticalIndicator(): void {
 		if (this.sliderX === null) return;
 		const p = this.p;
-
-		// Find the top and bottom y positions of points near the slider
-		const sliderContentX = (this.sliderX ?? 0) + this.viewOffsetX;
 
 		// Find the minimum and maximum y values of all visible points
 		let minY = this.canvasHeight;
