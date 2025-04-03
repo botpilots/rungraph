@@ -626,7 +626,12 @@ export class GoalGraphRenderer {
 			const drawX = col.currentX;
 			if (drawX + col.width < visibleLeft - buffer || drawX > visibleRight + buffer) return; // Clipping
 
-			const dayKey = col.date.toISOString().split('T')[0];
+			// Fix: Create a new Date object from the date and normalize it to start of day to ensure 
+			// we're only comparing dates without time components
+			const colDate = new Date(col.date);
+			colDate.setHours(0, 0, 0, 0);
+			const dayKey = colDate.toISOString().split('T')[0];
+
 			const yOffset = dailyAccumulatedHeight.get(dayKey) || 0;
 			const drawY = col.y - yOffset;
 
@@ -1044,7 +1049,7 @@ export class GoalGraphRenderer {
 					infoHTML += `
 						<p><strong>Week ${marker.weekNumber}</strong></p>
 						<p>Start: ${marker.date.toLocaleDateString('en-CA')}</p>
-						<p>End: ${weekEnd.toLocaleDateString('en-CA')}</p> {/* Use adjusted end date for display */}
+						<p>End: ${weekEnd.toLocaleDateString('en-CA')}</p>
 						<p>Distance: ${(weekDistance / 1000).toFixed(1)} km</p>
 						<p>Duration: ${formatSecondsToTime(weekDuration)}</p>
 					`;
