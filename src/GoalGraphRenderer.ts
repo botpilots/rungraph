@@ -1013,9 +1013,40 @@ export class GoalGraphRenderer {
 					// --- WeekMarker ---
 					const marker = item as WeekMarker;
 
+					// Calculate week summary from activities
+					let weekDistance = 0;
+					let weekDuration = 0;
+
+					// Find the index of the current marker to determine the next one
+					const currentMarkerIndex = this.weekMarkers.findIndex(wm => wm.date.getTime() === marker.date.getTime());
+
+					let weekEnd: Date;
+					if (currentMarkerIndex !== -1 && currentMarkerIndex < this.weekMarkers.length - 1) {
+						// If there's a next marker, use its date as the end date (exclusive)
+						weekEnd = new Date(this.weekMarkers[currentMarkerIndex + 1].date);
+					} else {
+						// If it's the last marker or not found (shouldn't happen), use the goal date
+						weekEnd = new Date(this.goalData.dateOfRace);
+					}
+
+					// Go back one day to get the last day of the week
+					weekEnd.setDate(weekEnd.getDate() - 1);
+
+					// Calculate the distance and duration for activities within the week
+					this.activities.forEach(activity => {
+						const activityDate = new Date(activity.start_date_local);
+						if (activityDate >= marker.date && activityDate < weekEnd) {
+							weekDistance += activity.distance;
+							weekDuration += activity.moving_time;
+						}
+					});
+
 					infoHTML += `
-						<p><strong>Week ${marker.weekNumber} Start</strong></p>
-						<p>${marker.date.toLocaleDateString('en-CA')}</p>
+						<p><strong>Week ${marker.weekNumber}</strong></p>
+						<p>Start: ${marker.date.toLocaleDateString('en-CA')}</p>
+						<p>End: ${weekEnd.toLocaleDateString('en-CA')}</p> {/* Use adjusted end date for display */}
+						<p>Distance: ${(weekDistance / 1000).toFixed(1)} km</p>
+						<p>Duration: ${formatSecondsToTime(weekDuration)}</p>
 					`;
 				}
 			});
