@@ -654,19 +654,8 @@ export class GoalGraphRenderer {
 			p.fill(isHovered ? hoverColor : baseColor);
 			p.stroke(isHovered ? p.color(60, 100, 180) : p.color(100, 150, 200));
 
-			// Determine if this column should connect with the next one (consecutive days)
-			let drawWidth = col.width;
-			if (index < sortedColumns.length - 1) {
-				const nextCol = sortedColumns[index + 1];
-				const dayDifference = Math.round((nextCol.date.getTime() - col.date.getTime()) / (24 * 60 * 60 * 1000));
 
-				// If columns are consecutive days, extend this column to touch the next one
-				if (dayDifference === 1) {
-					drawWidth = nextCol.currentX - col.currentX;
-				}
-			}
-
-			p.rect(drawX, drawY, drawWidth, col.height, 1);
+			p.rect(drawX, drawY, col.width, col.height, 1);
 
 			// Update accumulated height for this day AFTER drawing
 			dailyAccumulatedHeight.set(dayKey, yOffset + col.height);
