@@ -949,7 +949,10 @@ export class GoalGraphRenderer {
 						infoText.push(`Target Time: ${point.displayTime}`); // Keep original time display for goal
 						// Goal point date is already shown, specific start time of day isn't available/relevant here.
 					}
-				} else if ('height' in item) {
+				} else if ('height' in item && !this.hoveredItems.some(hoveredItem =>
+					'type' in hoveredItem &&
+					hoveredItem.type === 'trial' &&
+					hoveredItem.activity?.id === item.activity.id)) {
 					// --- WorkoutColumn ---
 					const column = item as WorkoutColumn; // Cast for type safety
 					const activity = column.activity;
@@ -973,8 +976,6 @@ export class GoalGraphRenderer {
 					infoText.push(`<strong>Week ${marker.weekNumber} Start</strong>`);
 					infoText.push(`${marker.date.toLocaleDateString('en-CA')}`);
 					// Add more relevant info for week markers if needed, e.g., weekly summary
-				} else {
-					console.warn("Unknown item was not added to info box: ", item);
 				}
 			});
 		} else {
