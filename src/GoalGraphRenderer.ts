@@ -1,6 +1,6 @@
 import p5 from 'p5';
 import { SummaryActivity } from './types/strava';
-import { Point, WorkoutColumn } from './types/graphRenderer';
+import { Point, WorkoutColumn, WeekMarker } from './types/graphRenderer';
 import {
 	parseTimeToSeconds,
 	formatSecondsToTime,
@@ -48,9 +48,7 @@ export class GoalGraphRenderer {
 
 	// Interaction state
 	private sliderX: number | null = null; // Slider position relative to visible canvas
-	private hoveredPoint: Point | null = null;
-	private hoveredColumn: WorkoutColumn | null = null;
-	private hoveredWeekMarker: { date: Date; originalX: number; currentX: number; weekNumber: number } | null = null; // Added for week marker hover
+	private hoveredItems: (Point | WorkoutColumn | WeekMarker)[] = [];
 	private isDraggingSlider = false;
 	private readonly pointSize = 10;
 	private readonly knobWidth = this.pointSize * 1.6;
@@ -458,9 +456,7 @@ export class GoalGraphRenderer {
 
 		// Only reset hover states if we're not currently dragging the graph
 		if (!this.isDraggingGraph) {
-			this.hoveredPoint = null;
-			this.hoveredColumn = null;
-			this.hoveredWeekMarker = null; // Reset week marker hover
+			this.hoveredItems = [];
 		}
 
 		// Calculate current X positions based on offset
@@ -494,40 +490,57 @@ export class GoalGraphRenderer {
 		const connectingLineLength = 10; // Length of the small line connecting tilted labels
 		let tiltedLabelOffsetX = -5; // Horizontal offset for tilted labels
 		let tiltedLabelOffsetY = 15; // Vertical offset specifically for tilted labels
+		const markerHoverRadius = 5; // Interaction radius for week markers
 
 		p.fill(150); // Use gray for all text labels
 		p.stroke(150); // Use gray for lines
 		p.strokeWeight(1); // Thin lines
 		p.textSize(this.axisLabelFontSize * 0.9); // Slightly smaller font for dates
 
+		// Calculate slider position in content coordinates only once
+		const sliderContentX = this.sliderX !== null ? this.sliderX + this.viewOffsetX : -Infinity;
+
 		// Find the very first and very last points for special vertical labeling
 		const firstPoint = this.points[0];
 		const lastPoint = this.points[this.points.length - 1];
 
-		// Draw Start and Goal Labels
-		[firstPoint, lastPoint].forEach(point => {
-			if (!point) return; // Skip if point doesn't exist (e.g., no data)
-			const drawX = point.currentX;
-			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return; // Clipping
+		// --- Pre-calculate hovered status for items --- 
+		const hoveredItemsSet = new Set(this.hoveredItems);
 
-			const dateStr = point.date.toISOString().split('T')[0]; // YYYY-MM-DD format
+		// --- Draw Start and Goal Labels (check if hovered) ---
+		[firstPoint, lastPoint].forEach(point => {
+			if (!point) return;
+			const drawX = point.currentX;
+			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return;
+
+			const isHovered = hoveredItemsSet.has(point);
+			const dateStr = point.date.toISOString().split('T')[0];
 
 			p.push();
 			p.translate(drawX, axisY + labelOffsetY);
 			p.rotate(p.radians(-90));
 			p.textAlign(p.RIGHT, p.CENTER);
 			p.noStroke();
-			p.fill(150);
+			p.fill(isHovered ? 50 : 150); // Darker if hovered
 			p.text(dateStr, 0, 0);
 			p.pop();
-			p.stroke(200); p.strokeWeight(1);
+			p.stroke(isHovered ? 100 : 200); p.strokeWeight(isHovered ? 1.5 : 1);
 			p.line(drawX, axisY, drawX, axisY + 5);
 		});
 
-		// --- Draw Monday Week Marker Labels (Tilted) ---
+		// --- Draw Monday Week Marker Labels (check if hovered) ---
 		this.weekMarkers.forEach(marker => {
 			const drawX = marker.currentX;
-			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return; // Clipping
+			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return;
+
+			// Check hover status from the pre-calculated set
+			const isHovered = hoveredItemsSet.has(marker);
+			// Add to hoveredItems during check phase (if slider active)
+			if (this.sliderX !== null && !this.isDraggingGraph && Math.abs(sliderContentX - marker.originalX) < markerHoverRadius) {
+				if (!isHovered) { // Avoid duplicates if already added
+					this.hoveredItems.push(marker);
+				}
+			}
 
 			let labelText = `Week ${marker.weekNumber}`;
 			tiltedLabelOffsetX = -5; // Reset offsets for standard view
@@ -540,17 +553,18 @@ export class GoalGraphRenderer {
 				labelText = `Week ${marker.weekNumber}\n${weekStartDateStr}`;
 			}
 
-			// Draw connecting line from axis down
-			p.stroke(180);
+			// Draw connecting line based on hover status
+			p.stroke(isHovered ? 100 : 180);
+			p.strokeWeight(isHovered ? 1.5 : 1);
 			p.line(drawX, axisY, drawX, axisY + connectingLineLength);
 
-			// Draw tilted text
+			// Draw tilted text based on hover status
 			p.push();
 			p.translate(drawX, axisY + connectingLineLength + tiltedLabelOffsetY);
 			p.rotate(p.radians(45));
 			p.textAlign(p.LEFT, p.BOTTOM);
 			p.noStroke();
-			p.fill(150);
+			p.fill(isHovered ? 50 : 150);
 			p.text(labelText, tiltedLabelOffsetX, 0);
 			p.pop();
 		});
@@ -601,27 +615,47 @@ export class GoalGraphRenderer {
 		}
 	}
 
+	/**
+	 * Draws the workout columns (stacked on top of each other)
+	 * @param visibleLeft - The left edge of the visible area
+	 * @param visibleRight - The right edge of the visible area
+	 * @param buffer - The buffer to use for clipping
+	 */
 	private drawWorkoutColumns(visibleLeft: number, visibleRight: number, buffer: number): void {
 		const p = this.p;
 		p.strokeWeight(0.8);
 
-		// Keep track of accumulated height per day for stacking
 		const dailyAccumulatedHeight: Map<string, number> = new Map();
-
-		// Sort columns by date for drawing in order (important for stacking order)
 		const sortedColumns = [...this.workoutColumns].sort((a, b) => a.date.getTime() - b.date.getTime());
+		const sliderContentX = this.sliderX !== null ? this.sliderX + this.viewOffsetX : -Infinity;
+		const hoveredItemsSet = new Set(this.hoveredItems);
 
 		sortedColumns.forEach((col, index) => {
 			const drawX = col.currentX;
 			if (drawX + col.width < visibleLeft - buffer || drawX > visibleRight + buffer) return; // Clipping
 
+			const dayKey = col.date.toISOString().split('T')[0];
+			const yOffset = dailyAccumulatedHeight.get(dayKey) || 0;
+			const drawY = col.y - yOffset;
+
+			// Check if the slider X is over the column stack
+			const isHoveredBySliderX = this.sliderX !== null && !this.isDraggingGraph && sliderContentX >= col.originalX && sliderContentX <= col.originalX + col.width;
+
+			// Add to hoveredItems if X matches
+			if (isHoveredBySliderX) {
+				if (!hoveredItemsSet.has(col)) {
+					this.hoveredItems.push(col);
+				}
+			}
+
+			// Check hover status from the (potentially updated) set for drawing
+			const isHovered = hoveredItemsSet.has(col) || (isHoveredBySliderX); // Visually hover if X matches
+
 			const baseColor = p.color(173, 216, 230, 200);
 			const hoverColor = p.color(100, 150, 230, 240);
-			const sliderContentX = (this.sliderX ?? -Infinity) + this.viewOffsetX;
-			const isHoveredBySlider = this.sliderX !== null && sliderContentX >= col.originalX && sliderContentX <= col.originalX + col.width;
 
-			p.fill(isHoveredBySlider ? hoverColor : baseColor);
-			p.stroke(isHoveredBySlider ? p.color(60, 100, 180) : p.color(100, 150, 200));
+			p.fill(isHovered ? hoverColor : baseColor);
+			p.stroke(isHovered ? p.color(60, 100, 180) : p.color(100, 150, 200));
 
 			// Determine if this column should connect with the next one (consecutive days)
 			let drawWidth = col.width;
@@ -635,21 +669,10 @@ export class GoalGraphRenderer {
 				}
 			}
 
-			// --- Stacking Logic ---
-			const dayKey = col.date.toISOString().split('T')[0]; // Get YYYY-MM-DD
-			const yOffset = dailyAccumulatedHeight.get(dayKey) || 0; // Get height already stacked for this day
-			const drawY = col.y - yOffset; // Adjust Y position upwards based on offset
-
-			p.rect(drawX, drawY, drawWidth, col.height, 1); // Draw at adjusted Y
+			p.rect(drawX, drawY, drawWidth, col.height, 1);
 
 			// Update accumulated height for this day AFTER drawing
 			dailyAccumulatedHeight.set(dayKey, yOffset + col.height);
-			// --- End Stacking Logic ---
-
-			// Only update hover state if we're not dragging the graph
-			if (isHoveredBySlider && !this.isDraggingGraph) {
-				this.hoveredColumn = col; // Note: This will still likely hover the last drawn column for the day
-			}
 		});
 	}
 
@@ -693,27 +716,34 @@ export class GoalGraphRenderer {
 	private drawPoints(visibleLeft: number, visibleRight: number, buffer: number): void {
 		const p = this.p;
 		const hoverRadius = this.pointSize / 2;
+		const sliderContentX = this.sliderX !== null ? this.sliderX + this.viewOffsetX : -Infinity;
+		const hoveredItemsSet = new Set(this.hoveredItems);
+
 		this.points.forEach(point => {
 			const drawX = point.currentX;
-			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return; // Clipping
+			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return;
+
+			// Check if slider X is over the point
+			const isHoveredBySlider = this.sliderX !== null && !this.isDraggingGraph && Math.abs(sliderContentX - point.originalX) < hoverRadius;
+
+			// Add to hoveredItems if slider X matches
+			if (isHoveredBySlider) {
+				if (!hoveredItemsSet.has(point)) {
+					this.hoveredItems.push(point);
+				}
+			}
+
+			// Check hover status from the (potentially updated) set for drawing
+			const isHovered = hoveredItemsSet.has(point) || isHoveredBySlider;
 
 			let pointColor: p5.Color;
 			if (point.type === 'start') pointColor = p.color('#2ca02c');
 			else if (point.type === 'goal') pointColor = p.color('#d62728');
 			else pointColor = p.color('#1f77b4');
 
-			const sliderContentX = (this.sliderX ?? -Infinity) + this.viewOffsetX;
-			const isHoveredBySlider = this.sliderX !== null && Math.abs(sliderContentX - point.originalX) < hoverRadius;
-
 			p.push();
-			if (isHoveredBySlider) {
+			if (isHovered) {
 				pointColor.setAlpha(255); p.stroke(0); p.strokeWeight(2);
-				// Only update hover state if we're not dragging the graph
-				if (!this.isDraggingGraph) {
-					this.hoveredPoint = point;
-					this.hoveredColumn = null; // Clear other hovers if point is hovered
-					this.hoveredWeekMarker = null;
-				}
 			} else {
 				pointColor.setAlpha(210); p.noStroke();
 			}
@@ -743,26 +773,6 @@ export class GoalGraphRenderer {
 				}
 			}
 		});
-
-		// Check for hovered week marker AFTER points/columns if none are hovered yet
-		if (this.sliderX !== null && !this.hoveredPoint && !this.hoveredColumn && !this.isDraggingGraph) {
-			const sliderContentX = this.sliderX + this.viewOffsetX;
-			const markerHoverRadius = 5; // pixels around the marker line
-			let closestMarker = null;
-			let minDistance = Infinity;
-
-			this.weekMarkers.forEach(marker => {
-				const distance = Math.abs(sliderContentX - marker.originalX);
-				if (distance < markerHoverRadius && distance < minDistance) {
-					minDistance = distance;
-					closestMarker = marker;
-				}
-			});
-
-			if (closestMarker) {
-				this.hoveredWeekMarker = closestMarker;
-			}
-		}
 	}
 
 	// --- Indicator and Slider Control (use canvas relative sliderX) ---
@@ -913,76 +923,54 @@ export class GoalGraphRenderer {
 		}
 
 		let infoText: string[] = [];
-		if (this.hoveredPoint) { /* ... populate for point ... */
-			infoText.push(`<strong>${this.hoveredPoint.type.charAt(0).toUpperCase() + this.hoveredPoint.type.slice(1)} Point</strong>`);
-			infoText.push(`Date: ${this.hoveredPoint.date.toLocaleDateString('en-CA')}`);
-			infoText.push(`Time: ${this.hoveredPoint.displayTime}`);
-			if (this.hoveredPoint.activity) {
-				infoText.push(`Activity: ${this.hoveredPoint.activity.name}`);
-				if (typeof this.hoveredPoint.activity.distance === 'number') {
-					infoText.push(`Distance: ${(this.hoveredPoint.activity.distance / 1000).toFixed(1)} km`);
+		if (this.hoveredItems.length > 0) {
+			this.hoveredItems.forEach((item, index) => {
+				if (index > 0) {
+					infoText.push(''); // Add a separator (<hr>) between items
 				}
-			} else if (this.hoveredPoint.type === 'start') {
-				infoText.push(`Starting Time`);
-			} else if (this.hoveredPoint.type === 'goal') {
-				infoText.push(`Target Time`);
-			}
-		} else if (this.hoveredColumn) { /* ... populate for column ... */
-			const activity = this.hoveredColumn.activity;
-			infoText.push(`<strong>Workout: ${activity.name}</strong>`);
-			infoText.push(`Date: ${new Date(activity.start_date_local).toLocaleDateString('en-CA')}`);
-			infoText.push(`Dist: ${(activity.distance / 1000).toFixed(2)} km`);
-			infoText.push(`Time: ${formatSecondsToTime(activity.moving_time)}`);
-			const paceSecondsPerKm = activity.distance > 0 ? (activity.moving_time / (activity.distance / 1000)) : 0;
-			if (paceSecondsPerKm > 0) {
-				const paceMinutes = Math.floor(paceSecondsPerKm / 60);
-				const paceSeconds = Math.floor(paceSecondsPerKm % 60);
-				infoText.push(`Pace: ${paceMinutes}:${String(paceSeconds).padStart(2, '0')} /km`);
-			} else { infoText.push(`Pace: N/A`); }
-		} else if (this.hoveredWeekMarker) {
-			// Display summary for the week ENDING before the hovered week start marker
-			const hoveredWeekStart = this.hoveredWeekMarker.date;
-			const previousWeekNumber = this.hoveredWeekMarker.weekNumber - 1;
-
-			// Calculate the start and end of the PREVIOUS week
-			const previousWeekStart = new Date(hoveredWeekStart);
-			previousWeekStart.setDate(hoveredWeekStart.getDate() - 7);
-			previousWeekStart.setHours(0, 0, 0, 0); // Start of the previous week start day
-
-			const previousWeekEnd = new Date(hoveredWeekStart);
-			previousWeekEnd.setHours(0, 0, 0, 0); // End is the very start of the hovered week start day
-
-			// Calculate the actual end date (the day before the hovered week start)
-			const actualWeekEndDate = new Date(previousWeekEnd.getTime() - 1);
-
-			// Helper function for formatting YYYY-MM-DD
-			const formatDate = (date: Date): string => {
-				const year = date.getFullYear();
-				const month = String(date.getMonth() + 1).padStart(2, '0');
-				const day = String(date.getDate()).padStart(2, '0');
-				return `${year}-${month}-${day}`;
-			};
-
-			infoText.push(`<strong>Week ${previousWeekNumber} Summary</strong>`);
-			// Updated format for the date range (YYYY-MM-DD - YYYY-MM-DD)
-			infoText.push(`${formatDate(previousWeekStart)} - ${formatDate(actualWeekEndDate)}`);
-			infoText.push(``);
-
-			let weeklyDistance = 0, weeklyTime = 0, weekActivityCount = 0;
-			this.activities.forEach(act => {
-				const actDate = new Date(act.start_date_local);
-				// Check if activity date is within the previous week [previousMonday, hoveredMonday)
-				if (actDate >= previousWeekStart && actDate < previousWeekEnd) {
-					weekActivityCount++;
-					weeklyDistance += act.distance || 0;
-					weeklyTime += act.moving_time || 0;
+				// Use property checking for interfaces
+				if ('type' in item) {
+					// --- Point --- 
+					const point = item as Point; // Cast for type safety
+					infoText.push(`<strong>${point.type.charAt(0).toUpperCase() + point.type.slice(1)} Point</strong>`);
+					infoText.push(`Date: ${point.date.toLocaleDateString('en-CA')}`);
+					infoText.push(`Time: ${point.displayTime}`);
+					if (point.activity) {
+						infoText.push(`Activity: ${point.activity.name}`);
+						if (typeof point.activity.distance === 'number') {
+							infoText.push(`Distance: ${(point.activity.distance / 1000).toFixed(1)} km`);
+						}
+					} else if (point.type === 'start') {
+						infoText.push(`Starting Time`);
+					} else if (point.type === 'goal') {
+						infoText.push(`Target Time`);
+					}
+				} else if ('height' in item) {
+					// --- WorkoutColumn --- 
+					const column = item as WorkoutColumn; // Cast for type safety
+					const activity = column.activity;
+					infoText.push(`<strong>Workout: ${activity.name}</strong>`);
+					infoText.push(`Date: ${new Date(activity.start_date_local).toLocaleDateString('en-CA')}`);
+					infoText.push(`Dist: ${(activity.distance / 1000).toFixed(2)} km`);
+					infoText.push(`Time: ${formatSecondsToTime(activity.moving_time)}`);
+					const paceSecondsPerKm = activity.distance > 0 ? (activity.moving_time / (activity.distance / 1000)) : 0;
+					if (paceSecondsPerKm > 0) {
+						const paceMinutes = Math.floor(paceSecondsPerKm / 60);
+						const paceSeconds = Math.floor(paceSecondsPerKm % 60);
+						infoText.push(`Pace: ${paceMinutes}:${String(paceSeconds).padStart(2, '0')} /km`);
+					} else { infoText.push(`Pace: N/A`); }
+				} else if ('weekNumber' in item) {
+					// --- WeekMarker --- (Add logic to display week marker info)
+					const marker = item as WeekMarker; // Cast for type safety
+					infoText.push(`<strong>Week ${marker.weekNumber} Start</strong>`);
+					infoText.push(`Date: ${marker.date.toLocaleDateString('en-CA')}`);
+					// Add more relevant info for week markers if needed, e.g., weekly summary
+				} else {
+					console.warn("Unknown item was not added to info box: ", item);
 				}
 			});
-			infoText.push(`Activities: ${weekActivityCount}`);
-			infoText.push(`Distance: ${(weeklyDistance / 1000).toFixed(1)} km`);
-			infoText.push(`Duration: ${formatSecondsToTime(weeklyTime)}`);
 		} else {
-			infoText.push("Move the slider over points or workout bars to see details.");
+			infoText.push("Move the slider over the graph to see details."); // Updated default message
 		}
 		const infoHTML = infoText.map(line => line === '' ? '<hr>' : `<p>${line}</p>`).join('');
 		this.infoBoxElement.innerHTML = infoHTML;
