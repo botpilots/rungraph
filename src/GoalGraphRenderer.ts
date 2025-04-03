@@ -225,8 +225,7 @@ export class GoalGraphRenderer {
 		// Calculate width of a single day in pixels
 		const millisecondsPerDay = 24 * 60 * 60 * 1000;
 		const dayWidth = (millisecondsPerDay / fullTimeSpan) * this.totalGraphContentWidth;
-		// Half day in milliseconds for centering points
-		const halfDayInMillis = millisecondsPerDay / 2;
+		const halfDayWidth = dayWidth / 2; // Calculate half day width for centering points
 
 		// --- Add points/columns, calculate originalX relative to total width ---
 		const mapTimeToX = (date: Date): number => {
@@ -234,23 +233,22 @@ export class GoalGraphRenderer {
 			return this.padding.left + timeRatioInFullSpan * this.totalGraphContentWidth;
 		};
 
-		// Map time to X with point centered in day
-		const mapPointTimeToX = (date: Date): number => {
-			// Create a new date with time shifted to middle of the day
-			const centeredDate = new Date(date.getTime() + halfDayInMillis);
-			return mapTimeToX(centeredDate);
-		};
-
 		const startTimeSeconds = parseTimeToSeconds(this.startData.currentRaceTime);
+		// Calculate start point position based on start of day + half day width
+		const startOfDayStartDate = new Date(startDate);
+		startOfDayStartDate.setHours(0, 0, 0, 0);
 		this.points.push({
-			originalX: mapPointTimeToX(startDate),
+			originalX: mapTimeToX(startOfDayStartDate) + halfDayWidth, // Use start of day + half width
 			currentX: 0, y: 0, date: startDate, timeSeconds: startTimeSeconds,
 			displayTime: formatSecondsToTime(startTimeSeconds), type: 'start',
 		});
 
 		const goalTimeSeconds = parseTimeToSeconds(this.goalData.targetRaceTime);
+		// Calculate goal point position based on start of day + half day width
+		const startOfDayGoalDate = new Date(goalDate);
+		startOfDayGoalDate.setHours(0, 0, 0, 0);
 		this.points.push({
-			originalX: mapPointTimeToX(goalDate),
+			originalX: mapTimeToX(startOfDayGoalDate) + halfDayWidth, // Use start of day + half width
 			currentX: 0, y: 0, date: goalDate, timeSeconds: goalTimeSeconds,
 			displayTime: this.goalData.targetRaceTime, type: 'goal',
 		});
@@ -382,10 +380,15 @@ export class GoalGraphRenderer {
 
 			const isTrial = activity.workout_type === 1;
 
+			// Calculate position based on the START of the day for columns and points.
+			const startOfDayDate = new Date(activityDate);
+			startOfDayDate.setHours(0, 0, 0, 0); // Set to beginning of the day
+			const columnStartX = mapTimeToX(startOfDayDate); // Get X position for 00:00:00
+
 			// Display points for trials only.
 			if (isTrial) {
 				this.points.push({
-					originalX: mapPointTimeToX(activityDate),
+					originalX: columnStartX + halfDayWidth, // Use column start X + half day width
 					currentX: 0, y: 0, date: activityDate, timeSeconds: activity.moving_time,
 					displayTime: formatSecondsToTime(activity.moving_time), type: 'trial',
 					activity: activity,
@@ -393,11 +396,6 @@ export class GoalGraphRenderer {
 			}
 
 			// Display columns for all activities, including trials.
-			// Calculate position based on the START of the day.
-			const startOfDayDate = new Date(activityDate);
-			startOfDayDate.setHours(0, 0, 0, 0); // Set to beginning of the day
-			const columnStartX = mapTimeToX(startOfDayDate); // Get X position for 00:00:00
-
 			this.workoutColumns.push({
 				originalX: columnStartX, // Use the calculated start-of-day X
 				currentX: 0, y: 0, width: dayWidth, height: 0,
@@ -973,7 +971,7 @@ export class GoalGraphRenderer {
 					// --- WeekMarker --- (Add logic to display week marker info)
 					const marker = item as WeekMarker; // Cast for type safety
 					infoText.push(`<strong>Week ${marker.weekNumber} Start</strong>`);
-					infoText.push(`Date: ${marker.date.toLocaleDateString('en-CA')}`);
+					infoText.push(`${marker.date.toLocaleDateString('en-CA')}`);
 					// Add more relevant info for week markers if needed, e.g., weekly summary
 				} else {
 					console.warn("Unknown item was not added to info box: ", item);
