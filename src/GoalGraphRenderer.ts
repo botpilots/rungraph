@@ -615,12 +615,6 @@ export class GoalGraphRenderer {
 		}
 	}
 
-	/**
-	 * Draws the workout columns (stacked on top of each other)
-	 * @param visibleLeft - The left edge of the visible area
-	 * @param visibleRight - The right edge of the visible area
-	 * @param buffer - The buffer to use for clipping
-	 */
 	private drawWorkoutColumns(visibleLeft: number, visibleRight: number, buffer: number): void {
 		const p = this.p;
 		p.strokeWeight(0.8);
@@ -928,31 +922,47 @@ export class GoalGraphRenderer {
 				if (index > 0) {
 					infoText.push(''); // Add a separator (<hr>) between items
 				}
+				// Helper function to format time (HH:MM)
+				const formatStartTime = (date: Date): string => {
+					const hours = String(date.getHours()).padStart(2, '0');
+					const minutes = String(date.getMinutes()).padStart(2, '0');
+					return `${hours}:${minutes}`;
+				};
+
 				// Use property checking for interfaces
 				if ('type' in item) {
-					// --- Point --- 
+					// --- Point ---
 					const point = item as Point; // Cast for type safety
 					infoText.push(`<strong>${point.type.charAt(0).toUpperCase() + point.type.slice(1)} Point</strong>`);
-					infoText.push(`Date: ${point.date.toLocaleDateString('en-CA')}`);
-					infoText.push(`Time: ${point.displayTime}`);
-					if (point.activity) {
+					infoText.push(`Date: ${point.date.toLocaleDateString('en-CA')}`); // Keep date for all points
+
+					if (point.activity) { // This covers 'trial' points with associated activity
 						infoText.push(`Activity: ${point.activity.name}`);
+						// Add Start Time for Trials
+						const activityDate = new Date(point.activity.start_date_local);
+						infoText.push(`Start Time: ${formatStartTime(activityDate)}`);
+						infoText.push(`Result Time: ${point.displayTime}`); // Label clarifies this is the trial result
 						if (typeof point.activity.distance === 'number') {
 							infoText.push(`Distance: ${(point.activity.distance / 1000).toFixed(1)} km`);
 						}
 					} else if (point.type === 'start') {
-						infoText.push(`Starting Time`);
+						infoText.push(`Starting Time: ${point.displayTime}`); // Keep original time display for start
 					} else if (point.type === 'goal') {
-						infoText.push(`Target Time`);
+						infoText.push(`Target Time: ${point.displayTime}`); // Keep original time display for goal
+						// Goal point date is already shown, specific start time of day isn't available/relevant here.
 					}
 				} else if ('height' in item) {
-					// --- WorkoutColumn --- 
+					// --- WorkoutColumn ---
 					const column = item as WorkoutColumn; // Cast for type safety
 					const activity = column.activity;
+					const activityDate = new Date(activity.start_date_local);
 					infoText.push(`<strong>Workout: ${activity.name}</strong>`);
-					infoText.push(`Date: ${new Date(activity.start_date_local).toLocaleDateString('en-CA')}`);
+					infoText.push(`Date: ${activityDate.toLocaleDateString('en-CA')}`);
+					// Add Start Time for Workouts
+					infoText.push(`Start Time: ${formatStartTime(activityDate)}`);
 					infoText.push(`Dist: ${(activity.distance / 1000).toFixed(2)} km`);
-					infoText.push(`Time: ${formatSecondsToTime(activity.moving_time)}`);
+					// Change label to Duration for moving_time
+					infoText.push(`Duration: ${formatSecondsToTime(activity.moving_time)}`);
 					const paceSecondsPerKm = activity.distance > 0 ? (activity.moving_time / (activity.distance / 1000)) : 0;
 					if (paceSecondsPerKm > 0) {
 						const paceMinutes = Math.floor(paceSecondsPerKm / 60);
