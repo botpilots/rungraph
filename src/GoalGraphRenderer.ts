@@ -605,7 +605,10 @@ export class GoalGraphRenderer {
 		const p = this.p;
 		p.strokeWeight(0.8);
 
-		// Sort columns by date for drawing in order
+		// Keep track of accumulated height per day for stacking
+		const dailyAccumulatedHeight: Map<string, number> = new Map();
+
+		// Sort columns by date for drawing in order (important for stacking order)
 		const sortedColumns = [...this.workoutColumns].sort((a, b) => a.date.getTime() - b.date.getTime());
 
 		sortedColumns.forEach((col, index) => {
@@ -632,11 +635,20 @@ export class GoalGraphRenderer {
 				}
 			}
 
-			p.rect(drawX, col.y, drawWidth, col.height, 1);
+			// --- Stacking Logic ---
+			const dayKey = col.date.toISOString().split('T')[0]; // Get YYYY-MM-DD
+			const yOffset = dailyAccumulatedHeight.get(dayKey) || 0; // Get height already stacked for this day
+			const drawY = col.y - yOffset; // Adjust Y position upwards based on offset
+
+			p.rect(drawX, drawY, drawWidth, col.height, 1); // Draw at adjusted Y
+
+			// Update accumulated height for this day AFTER drawing
+			dailyAccumulatedHeight.set(dayKey, yOffset + col.height);
+			// --- End Stacking Logic ---
 
 			// Only update hover state if we're not dragging the graph
 			if (isHoveredBySlider && !this.isDraggingGraph) {
-				this.hoveredColumn = col;
+				this.hoveredColumn = col; // Note: This will still likely hover the last drawn column for the day
 			}
 		});
 	}
