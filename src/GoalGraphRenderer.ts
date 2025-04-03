@@ -463,6 +463,35 @@ export class GoalGraphRenderer {
 		this.weekMarkers.forEach(wm => wm.currentX = wm.originalX - this.viewOffsetX); // Update week marker currentX
 		this.dayMarkers.forEach(dm => dm.currentX = dm.originalX - this.viewOffsetX); // Update day marker currentX
 
+		// Calculate slider position in content coordinates only once
+		const sliderContentX = this.sliderX !== null ? this.sliderX + this.viewOffsetX : -Infinity;
+
+		// Add hovering detection for items based on slider position
+		if (this.sliderX !== null && !this.isDraggingGraph) {
+			// Check week markers
+			const markerHoverRadius = 5; // Interaction radius for week markers
+			this.weekMarkers.forEach(marker => {
+				if (Math.abs(sliderContentX - marker.originalX) < markerHoverRadius) {
+					this.hoveredItems.push(marker);
+				}
+			});
+
+			// Check points
+			const pointHoverRadius = this.pointSize / 2;
+			this.points.forEach(point => {
+				if (Math.abs(sliderContentX - point.originalX) < pointHoverRadius) {
+					this.hoveredItems.push(point);
+				}
+			});
+
+			// Check workout columns
+			this.workoutColumns.forEach(col => {
+				if (sliderContentX >= col.originalX && sliderContentX <= col.originalX + col.width) {
+					this.hoveredItems.push(col);
+				}
+			});
+		}
+
 		// Define visible boundaries for drawing/clipping
 		const visibleLeft = this.padding.left;
 		const visibleRight = this.canvasWidth - this.padding.right;
@@ -495,15 +524,9 @@ export class GoalGraphRenderer {
 		p.strokeWeight(1); // Thin lines
 		p.textSize(this.axisLabelFontSize * 0.9); // Slightly smaller font for dates
 
-		// Calculate slider position in content coordinates only once
-		const sliderContentX = this.sliderX !== null ? this.sliderX + this.viewOffsetX : -Infinity;
-
 		// Find the very first and very last points for special vertical labeling
 		const firstPoint = this.points[0];
 		const lastPoint = this.points[this.points.length - 1];
-
-		// --- Pre-calculate hovered status for items --- 
-		const hoveredItemsSet = new Set(this.hoveredItems);
 
 		// --- Draw Start and Goal Labels (check if hovered) ---
 		[firstPoint, lastPoint].forEach(point => {
@@ -511,7 +534,7 @@ export class GoalGraphRenderer {
 			const drawX = point.currentX;
 			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return;
 
-			const isHovered = hoveredItemsSet.has(point);
+			const isHovered = this.hoveredItems.includes(point);
 			const dateStr = point.date.toISOString().split('T')[0];
 
 			p.push();
@@ -531,14 +554,7 @@ export class GoalGraphRenderer {
 			const drawX = marker.currentX;
 			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return;
 
-			// Check hover status from the pre-calculated set
-			const isHovered = hoveredItemsSet.has(marker);
-			// Add to hoveredItems during check phase (if slider active)
-			if (this.sliderX !== null && !this.isDraggingGraph && Math.abs(sliderContentX - marker.originalX) < markerHoverRadius) {
-				if (!isHovered) { // Avoid duplicates if already added
-					this.hoveredItems.push(marker);
-				}
-			}
+			const isHovered = this.hoveredItems.includes(marker);
 
 			let labelText = `Week ${marker.weekNumber}`;
 			tiltedLabelOffsetX = -5; // Reset offsets for standard view
@@ -621,7 +637,6 @@ export class GoalGraphRenderer {
 
 		const dailyAccumulatedHeight: Map<string, number> = new Map();
 		const sortedColumns = [...this.workoutColumns].sort((a, b) => a.date.getTime() - b.date.getTime());
-		const sliderContentX = this.sliderX !== null ? this.sliderX + this.viewOffsetX : -Infinity;
 		const hoveredItemsSet = new Set(this.hoveredItems);
 
 		sortedColumns.forEach((col, index) => {
@@ -637,18 +652,8 @@ export class GoalGraphRenderer {
 			const yOffset = dailyAccumulatedHeight.get(dayKey) || 0;
 			const drawY = col.y - yOffset;
 
-			// Check if the slider X is over the column stack
-			const isHoveredBySliderX = this.sliderX !== null && !this.isDraggingGraph && sliderContentX >= col.originalX && sliderContentX <= col.originalX + col.width;
-
-			// Add to hoveredItems if X matches
-			if (isHoveredBySliderX) {
-				if (!hoveredItemsSet.has(col)) {
-					this.hoveredItems.push(col);
-				}
-			}
-
 			// Check hover status from the (potentially updated) set for drawing
-			const isHovered = hoveredItemsSet.has(col) || (isHoveredBySliderX); // Visually hover if X matches
+			const isHovered = hoveredItemsSet.has(col);
 
 			const baseColor = p.color(173, 216, 230, 200);
 			const hoverColor = p.color(100, 150, 230, 240);
@@ -704,25 +709,14 @@ export class GoalGraphRenderer {
 	private drawPoints(visibleLeft: number, visibleRight: number, buffer: number): void {
 		const p = this.p;
 		const hoverRadius = this.pointSize / 2;
-		const sliderContentX = this.sliderX !== null ? this.sliderX + this.viewOffsetX : -Infinity;
 		const hoveredItemsSet = new Set(this.hoveredItems);
 
 		this.points.forEach(point => {
 			const drawX = point.currentX;
 			if (drawX < visibleLeft - buffer || drawX > visibleRight + buffer) return;
 
-			// Check if slider X is over the point
-			const isHoveredBySlider = this.sliderX !== null && !this.isDraggingGraph && Math.abs(sliderContentX - point.originalX) < hoverRadius;
-
-			// Add to hoveredItems if slider X matches
-			if (isHoveredBySlider) {
-				if (!hoveredItemsSet.has(point)) {
-					this.hoveredItems.push(point);
-				}
-			}
-
 			// Check hover status from the (potentially updated) set for drawing
-			const isHovered = hoveredItemsSet.has(point) || isHoveredBySlider;
+			const isHovered = hoveredItemsSet.has(point);
 
 			let pointColor: p5.Color;
 			if (point.type === 'start') pointColor = p.color('#2ca02c');
