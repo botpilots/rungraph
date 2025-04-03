@@ -933,7 +933,17 @@ export class GoalGraphRenderer {
 					hoveredItem.type === 'trial' &&
 					hoveredItem.activity?.id === item.activity.id
 				))
-			);
+			).sort((a, b) => {
+				// The one without acitivity comes first
+				if (!('activity' in a) && 'activity' in b) return -1;
+
+				// If both have activity, sort by date
+				if ('activity' in a && 'activity' in b && a.activity && b.activity) {
+					return new Date(a.activity.start_date_local).getTime() - new Date(b.activity.start_date_local).getTime();
+				}
+
+				return 0;
+			});
 
 			// Render the filtered items
 			itemsToRender.forEach((item, index) => {
