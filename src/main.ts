@@ -4,10 +4,10 @@ import { GoalGraphRenderer } from './GoalGraphRenderer'
 // Removed: import { fetchStravaActivities } from './stravaApi'
 import { StartData, GoalData } from './types/common'
 import { SummaryActivity } from './types/strava'; // Import needed types
+import activitiesJson from '../data/activities.json';
 
 // Main asynchronous function to initialize the application
 async function initializeApp() {
-	let activities: SummaryActivity[]; // Use the specific type from Strava types
 	let start: StartData;
 	let goal: GoalData;
 
@@ -25,18 +25,8 @@ async function initializeApp() {
 
 	try {
 		console.log("Fetching activity data from static file...");
-		// Construct the URL using Vite's base URL environment variable
-		// This ensures the correct path in both development (/) and production (/rungraph/)
-		const dataUrl = `${import.meta.env.BASE_URL}data/activities.json`;
-		console.log(`Attempting to fetch data from: ${dataUrl}`)
-
-		const response = await fetch(dataUrl);
-		if (!response.ok) {
-			throw new Error(`HTTP error! status: ${response.status} while fetching ${dataUrl}`);
-		}
-		activities = await response.json();
-		console.log(`Successfully loaded ${activities.length} activities from ${dataUrl}`);
-
+		const activities = activitiesJson as unknown as SummaryActivity[];
+		console.log(`Successfully loaded ${activities.length} activities`);
 
 		// TODO: Determine 'start' and 'goal' properly.
 		// Using sample data generation just for start/goal for now:
