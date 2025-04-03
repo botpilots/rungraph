@@ -926,7 +926,8 @@ export class GoalGraphRenderer {
 		if (this.hoveredItems.length > 0) {
 			// Preflight check to determine which items to render
 			const itemsToRender = this.hoveredItems.filter(item =>
-				// Allowed items are points or workout columns that don't have a trial point with the same activity ID
+				// Allowed items are weekNumbers, points or workout columns that don't have a trial point with the same activity ID.
+				('weekNumber' in item) ||
 				('type' in item) ||
 				('height' in item && !this.hoveredItems.some(hoveredItem =>
 					'type' in hoveredItem &&
