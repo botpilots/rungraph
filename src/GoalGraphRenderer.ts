@@ -945,31 +945,35 @@ export class GoalGraphRenderer {
 				// Use property checking for interfaces
 				if ('type' in item) {
 					// --- Point ---
-					const point = item as Point; // Cast for type safety
-					const pointTitle = point.type.charAt(0).toUpperCase() + point.type.slice(1);
+					const point = item as Point;
 					const pointDate = point.date.toLocaleDateString('en-CA');
 
-					infoHTML += `
-						<p><strong>${pointTitle} Point</strong></p>
-						<p>Date: ${pointDate}</p>
-					`;
-
-					if (point.activity) { // This covers 'trial' points with associated activity
-						const activityDate = new Date(point.activity.start_date_local);
-						const distance = typeof point.activity.distance === 'number'
-							? `<p>Distance: ${(point.activity.distance / 1000).toFixed(1)} km</p>`
+					// Handle each point type separately
+					if (point.type === 'start') {
+						infoHTML += `
+							<p><strong>Start</strong></p>
+							<p>Date: ${pointDate}</p>
+							<p>Starting Time: ${point.displayTime}</p>
+						`;
+					} else if (point.type === 'goal') {
+						infoHTML += `
+							<p><strong>Goal</strong></p>
+							<p>Date: ${pointDate}</p>
+							<p>Target Time: ${point.displayTime}</p>
+						`;
+					} else if (point.type === 'trial') {
+						const activityDate = new Date(point.activity!.start_date_local);
+						const distance = typeof point.activity!.distance === 'number'
+							? `<p>Distance: ${(point.activity!.distance / 1000).toFixed(1)} km</p>`
 							: '';
 
 						infoHTML += `
-							<p>Activity: ${point.activity.name}</p>
+							<p><strong>Trial: ${point.activity!.name}</strong></p>
+							<p>Date: ${pointDate}</p>
 							<p>Start Time: ${formatStartTime(activityDate)}</p>
 							<p>Result Time: ${point.displayTime}</p>
 							${distance}
 						`;
-					} else if (point.type === 'start') {
-						infoHTML += `<p>Starting Time: ${point.displayTime}</p>`;
-					} else if (point.type === 'goal') {
-						infoHTML += `<p>Target Time: ${point.displayTime}</p>`;
 					}
 				} else if ('height' in item) {
 					// --- WorkoutColumn ---
