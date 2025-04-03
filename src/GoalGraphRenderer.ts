@@ -485,7 +485,7 @@ export class GoalGraphRenderer {
 		const p = this.p;
 		const axisY = this.canvasHeight - this.padding.bottom;
 		const labelOffsetY = 12; // Vertical offset for start/end labels
-		const connectingLineLength = 10; // Length of the small line connecting tilted labels
+		let connectingLineLength = 10; // Length of the small line connecting tilted labels
 		let tiltedLabelOffsetX = -5; // Horizontal offset for tilted labels
 		let tiltedLabelOffsetY = 15; // Vertical offset specifically for tilted labels
 		const markerHoverRadius = 5; // Interaction radius for week markers
@@ -545,6 +545,7 @@ export class GoalGraphRenderer {
 			tiltedLabelOffsetY = 15;
 
 			if (this.viewMode === '3weeks') {
+				connectingLineLength = 20;
 				tiltedLabelOffsetX = -15;
 				tiltedLabelOffsetY = 30;
 				const weekStartDateStr = marker.date.toISOString().split('T')[0];
@@ -571,8 +572,9 @@ export class GoalGraphRenderer {
 		if (this.viewMode === '3weeks') {
 			// Use a smaller font and shorter connecting line for day markers
 			const dayLabelFontSize = this.axisLabelFontSize * 0.8;
-			const dayConnectingLineLength = connectingLineLength * 0.7;
-			const dayTiltedLabelOffsetY = tiltedLabelOffsetY * 0.7;
+			const dayConnectingLineLength = 10;
+			const dayTiltedLabelOffsetY = 15;
+			const dayTiltedLabelOffsetX = -8;
 
 			p.textSize(dayLabelFontSize);
 
@@ -592,7 +594,7 @@ export class GoalGraphRenderer {
 				p.textAlign(p.LEFT, p.BOTTOM);
 				p.noStroke();
 				p.fill(170); // Lighter fill for day markers
-				p.text(marker.dayName.substring(0, 3), -3, 0); // Use 3-letter day abbreviation
+				p.text(marker.dayName.substring(0, 3), dayTiltedLabelOffsetX, 0); // Use 3-letter day abbreviation
 				p.pop();
 			});
 
