@@ -956,6 +956,41 @@ export class GoalGraphRenderer {
 							<p>Date: ${pointDate}</p>
 							<p>Starting Time: ${point.displayTime}</p>
 						`;
+
+						// Add Week 1 summary with horizontal line
+						infoHTML += '<hr>';
+
+						// Calculate Week 1 summary from activities
+						let week1Distance = 0;
+						let week1Duration = 0;
+
+						// Determine Week 1 end date (use first week marker if available, otherwise calculate)
+						let week1End: Date;
+						if (this.weekMarkers.length > 0) {
+							// If we have week markers, use the first one as the end date
+							week1End = new Date(this.weekMarkers[0].date);
+						} else {
+							// If no week markers, calculate a week from start date
+							week1End = new Date(point.date);
+							week1End.setDate(week1End.getDate() + 7);
+						}
+
+						// Calculate the distance and duration for activities within Week 1
+						this.activities.forEach(activity => {
+							const activityDate = new Date(activity.start_date_local);
+							if (activityDate >= point.date && activityDate < week1End) {
+								week1Distance += activity.distance;
+								week1Duration += activity.moving_time;
+							}
+						});
+
+						infoHTML += `
+							<p><strong>Week 1</strong></p>
+							<p>Start: ${point.date.toLocaleDateString('en-CA')}</p>
+							<p>End: ${week1End.toLocaleDateString('en-CA')}</p>
+							<p>Distance: ${(week1Distance / 1000).toFixed(1)} km</p>
+							<p>Duration: ${formatSecondsToTime(week1Duration)}</p>
+						`;
 					} else if (point.type === 'goal') {
 						infoHTML += `
 							<p><strong>Goal</strong></p>
