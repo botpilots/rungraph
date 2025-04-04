@@ -1,13 +1,13 @@
 {
-	"projectTitle": "Göteborgsvarvet 2025 Challenge",
-	"projectDesc": "I thought it would be nice to have a simple way for friends to see my progress over time as I try to beat my current time of 01:30:30 for Göteborgsvarvet, hence I created this small statistical view based on my Strava activity feed. My intention creating this graph has also been to promote healthy running habits and race expectations.\nThe strategy I currently employ in my training is to focus on volume and consistency and not necessarly on so much running but instead diversify with lots of biking, rowing and other good alternatives for building an aerobic base. This strategy allows me to get a great amounts of return in relation to risk. This because I have found that it's injury which keeps back my progress the most. Then every week or so I'll trial myself to track my progress and to leverage the fact that \"you become good at what you do\".\nThe points are occasions where I test myself in a trial trying to beat my current half marathon time, doing so trying to simulate the real race conditions as close as possible. The columns represent training time per day.\nIf you'd like to know more about how I train, there's a link to my blog below.",
+	"projectTitle": "Göteborgsvarvet 2025 Volume Challenge",
+	"projectDesc": "I thought it would be nice to have a simple way for friends to see my progress over time as I try to beat my current time of 01:30:30 for Göteborgsvarvet, hence I created this small statistical view based on my Strava activity feed. My intention creating this graph has also been to promote healthy running habits and race expectations.\nThe strategy I currently employ in my training is to focus on volume and consistency and not necessarly on so much running but instead diversify with lots of biking, rowing and other good alternatives for building an aerobic base. This strategy allows me to get a great amounts of return in relation to risk. This because I have found that it's injury which keeps back my progress the most. Then every week or so I'll trial myself to track my progress and to leverage the fact that \"you become good at what you do\".\nThe points are occasions where I test myself in a trial trying to beat my current half marathon time, doing so trying to simulate the real race conditions as close as possible. The columns represent training time per day.\nIf you'd like to know more about me and how I train, there's a link to my blog below.",
 	"distance": 21100,
 	"startData": {
 		"currentRaceTime": "01:31:00",
 		"date": "2025-03-31"
 	},
 	"goalData": {
-		"targetRaceTime": "01:10:00",
+		"targetRaceTime": "01:20:00",
 		"dateOfRace": "2025-05-17"
 	},
 	"athlete": {
@@ -16,5 +16,5 @@
 		"blogUrl": "URLHere",
 		"stravaId": 135151962
 	},
-	"fetchActivitiesUrl": "URLHere"
+	"fetchActivitiesUrl": "localMode"
 }

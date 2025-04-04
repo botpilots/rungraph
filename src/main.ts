@@ -40,7 +40,7 @@ async function initializeApp() {
 		const fetchUrl = projectConfig.fetchActivitiesUrl;
 
 		// If the URL is a placeholder, fallback to local data
-		if (fetchUrl === "URLHere") {
+		if (fetchUrl === "localMode") {
 			console.log("Using local activities data as fallback...");
 			const dataUrl = `${import.meta.env.BASE_URL}data/activities.json`;
 			console.log(`Attempting to fetch data from: ${dataUrl}`);
@@ -82,7 +82,7 @@ async function initializeApp() {
 					<h1>${projectConfig.projectTitle}</h1>
 					${projectConfig.projectDesc.split('\n').map(paragraph => `<p>${paragraph}</p>`).join('')}
 					<p>Regards,<br>${projectConfig.athlete.name}</p>
-					<p><i>For more information about the athlete <a href="${projectConfig.athlete.blogUrl}" target="_blank">click here.</a></i></p>
+					<p><i>For information about the athlete <a href="${projectConfig.athlete.blogUrl}" target="_blank">click here.</a></i></p>
 					<button id="close-info">Close</button>
 				</div>
 			</div>
