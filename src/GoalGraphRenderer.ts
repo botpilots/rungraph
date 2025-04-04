@@ -1,6 +1,7 @@
 import p5 from 'p5';
 import { SummaryActivity } from './types/strava';
 import { Point, WorkoutColumn, WeekMarker } from './types/graphRenderer';
+import { StartData, GoalData } from './types/common';
 import {
 	parseTimeToSeconds,
 	formatSecondsToTime,
@@ -13,8 +14,8 @@ import {
 
 export class GoalGraphRenderer {
 	private p: p5;
-	private startData: { currentRaceTime: string; date: Date };
-	private goalData: { targetRaceTime: string; dateOfRace: Date };
+	private startData: StartData;
+	private goalData: GoalData;
 	private activities: SummaryActivity[];
 
 	// Week configuration
@@ -78,8 +79,8 @@ export class GoalGraphRenderer {
 
 	constructor(
 		p: p5,
-		start: { currentRaceTime: string; date: Date },
-		goal: { targetRaceTime: string; dateOfRace: Date },
+		start: StartData,
+		goal: GoalData,
 		activities: SummaryActivity[],
 		parentContainerId: string,
 		// trialDay: string = 'sunday', // Removed trialDay parameter, can be used as indication of trial day perhaps going forward.
