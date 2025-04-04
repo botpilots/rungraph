@@ -924,13 +924,6 @@ export class GoalGraphRenderer {
 			return;
 		}
 
-		// Helper function to format time (HH:MM)
-		const formatStartTime = (date: Date): string => {
-			const hours = String(date.getHours()).padStart(2, '0');
-			const minutes = String(date.getMinutes()).padStart(2, '0');
-			return `${hours}:${minutes}`;
-		};
-
 		let infoHTML = '';
 
 		if (this.hoveredItems.length > 0) {
@@ -974,7 +967,7 @@ export class GoalGraphRenderer {
 						infoHTML += `
 							<p><strong>Start</strong></p>
 							<p>Date: ${pointDate}</p>
-							<p>Starting Time: ${point.displayTime}</p>
+							<p>Current Race Time: ${point.displayTime}</p>
 						`;
 
 						// Add Week 1 summary with horizontal line
@@ -1023,10 +1016,17 @@ export class GoalGraphRenderer {
 							? `<p>Distance: ${(point.activity!.distance / 1000).toFixed(1)} km</p>`
 							: '';
 
+						// Extract time from start_date_local by first converting to string if needed
+						// This handles both cases where it might be a string already or a Date object
+						const dateStr = point.activity!.start_date_local.toString();
+						const trialStartTime = dateStr.includes('T')
+							? dateStr.split('T')[1].substring(0, 5)  // Handle ISO string format "2023-04-05T14:30:00Z"
+							: activityDate.toTimeString().substring(0, 5); // Fallback to date object
+
 						infoHTML += `
 							<p><strong>Trial: ${point.activity!.name}</strong></p>
 							<p>Date: ${pointDate}</p>
-							<p>Start Time: ${formatStartTime(activityDate)}</p>
+							<p>Start Time: ${trialStartTime}</p> 
 							<p>Result Time: ${point.displayTime}</p>
 							${distance}
 						`;
@@ -1046,10 +1046,18 @@ export class GoalGraphRenderer {
 						paceText = `${paceMinutes}:${String(paceSeconds).padStart(2, '0')} /km`;
 					}
 
+					// Extract time from start_date_local by first converting to string if needed
+					// This handles both cases where it might be a string already or a Date object
+					const dateStr = activity.start_date_local.toString();
+					const workoutStartTime = dateStr.includes('T')
+						? dateStr.split('T')[1].substring(0, 5)  // Handle ISO string format "2023-04-05T14:30:00Z"
+						: activityDate.toTimeString().substring(0, 5); // Fallback to date object
+
 					infoHTML += `
 						<p><strong>Workout: ${activity.name}</strong></p>
 						<p>Date: ${activityDate.toLocaleDateString('en-CA')}</p>
-						<p>Start Time: ${formatStartTime(activityDate)}</p>
+						<p>Start Time: ${workoutStartTime}</p>
+						<p>Sport: ${activity.sport_type}</p>
 						<p>Dist: ${(activity.distance / 1000).toFixed(2)} km</p>
 						<p>Duration: ${formatSecondsToTime(activity.moving_time)}</p>
 						<p>Pace: ${paceText}</p>
