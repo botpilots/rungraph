@@ -231,14 +231,35 @@ export class GoalGraphRenderer {
 			return this.padding.left + timeRatioInFullSpan * this.totalGraphContentWidth;
 		};
 
-		const startTimeSeconds = parseTimeToSeconds(this.startData.currentRaceTime);
+		// --- Determine Start Time (potentially overridden by a trial on the same day) ---
+		let startTimeSeconds = parseTimeToSeconds(this.startData.currentRaceTime);
+		let startTimeDisplay = formatSecondsToTime(startTimeSeconds); // Default display time
+
+		const startDayTimestamp = new Date(this.startData.date);
+		startDayTimestamp.setHours(0, 0, 0, 0); // Normalize start date
+		const startTimestamp = startDayTimestamp.getTime();
+
+		const startDayTrialActivity = this.activities.find(activity => {
+			if (activity.workout_type !== 1) return false; // Must be a trial
+			const activityDate = new Date(activity.start_date_local);
+			activityDate.setHours(0, 0, 0, 0); // Normalize activity date
+			return activityDate.getTime() === startTimestamp && typeof activity.moving_time === 'number' && activity.moving_time > 0;
+		});
+
+		if (startDayTrialActivity) {
+			startTimeSeconds = startDayTrialActivity.moving_time;
+			startTimeDisplay = formatSecondsToTime(startTimeSeconds); // Use trial time for display
+			console.log(`Overriding start time with trial activity on ${this.startData.date.toLocaleDateString()}: ${startTimeDisplay}`);
+		}
+
 		// Calculate start point position based on start of day + half day width
 		const startOfDayStartDate = new Date(startDate);
 		startOfDayStartDate.setHours(0, 0, 0, 0);
 		this.points.push({
 			originalX: mapTimeToX(startOfDayStartDate) + halfDayWidth, // Use start of day + half width
-			currentX: 0, y: 0, date: startDate, timeSeconds: startTimeSeconds,
-			displayTime: formatSecondsToTime(startTimeSeconds), type: 'start',
+			currentX: 0, y: 0, date: startDate, timeSeconds: startTimeSeconds, // Use potentially overridden time
+			displayTime: startTimeDisplay, // Use potentially overridden display time
+			type: 'start',
 		});
 
 		const goalTimeSeconds = parseTimeToSeconds(this.goalData.targetRaceTime);
@@ -384,12 +405,19 @@ export class GoalGraphRenderer {
 
 			// Display points for trials only.
 			if (isTrial) {
-				this.points.push({
-					originalX: columnStartX + halfDayWidth, // Use column start X + half day width
-					currentX: 0, y: 0, date: activityDate, timeSeconds: activity.moving_time,
-					displayTime: formatSecondsToTime(activity.moving_time), type: 'trial',
-					activity: activity,
-				});
+				const activityDayTimestamp = new Date(activityDate);
+				activityDayTimestamp.setHours(0, 0, 0, 0);
+				// Add check: Only add trial point if its date is different from the normalized start date
+				if (activityDayTimestamp.getTime() !== startTimestamp) {
+					this.points.push({
+						originalX: columnStartX + halfDayWidth, // Use column start X + half day width
+						currentX: 0, y: 0, date: activityDate, timeSeconds: activity.moving_time,
+						displayTime: formatSecondsToTime(activity.moving_time), type: 'trial',
+						activity: activity,
+					});
+				} else {
+					console.log(`Skipping trial point creation for activity on start date: ${activity.name}`);
+				}
 			}
 
 			// Display columns for all activities, including trials.
