@@ -81,22 +81,22 @@ jobs:
           # Strava refresh tokens *can* change, although it's not guaranteed on every refresh.
           # Handling this requires more advanced logic (e.g., using the GitHub API to update secrets).
 
-          # Ensure the data directory exists before saving the file
-          mkdir -p data
+          # Ensure the public data directory exists before saving the file
+          mkdir -p public/data
 
           echo "Fetching Strava activities..."
           # Use curl to make a GET request to the Strava API's activities endpoint.
           # Include the obtained access token in the Authorization header (Bearer token).
           # Fetches the most recent activities (default is 30 per page). Adjust 'per_page' as needed (max 200).
-          # The response (a JSON array of activities) is saved to data/activities.json
+          # The response (a JSON array of activities) is saved to public/data/activities.json
           # You could add query parameters like 'before', 'after', 'page' if needed:
           # e.g., "https://www.strava.com/api/v3/athlete/activities?per_page=50&after=<timestamp>"
           curl -X GET "https://www.strava.com/api/v3/athlete/activities?per_page=200" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
-            -o data/activities.json \
+            -o public/data/activities.json \
             --fail # Make curl exit with an error if the HTTP request fails
 
-          echo "Strava data fetched successfully and saved to data/activities.json"
+          echo "Strava data fetched successfully and saved to public/data/activities.json"
 
       # Step 3: Commit and push the updated data file if changes exist
       - name: Commit and Push Strava Data
@@ -109,17 +109,17 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
           FETCH_TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          LOG_FILE="data/fetch_log.txt"
-          DATA_FILE="data/activities.json"
-          CHECKSUM_FILE="data/last_checksum.txt"
+          LOG_FILE="public/data/fetch_log.txt"
+          DATA_FILE="public/data/activities.json"
+          CHECKSUM_FILE="public/data/last_checksum.txt"
           NEW_CHECKSUM=""
           PREV_CHECKSUM=""
           STATUS="Success"
           DATA_CHANGED="No"
           ERROR_MSG=""
 
-          # Ensure log directory exists
-          mkdir -p data
+          # Ensure public log directory exists
+          mkdir -p public/data
 
           # Check if data file was actually created (covers fetch errors where file might be missing)
           if [ ! -f "$DATA_FILE" ]; then
