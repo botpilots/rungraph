@@ -8,6 +8,10 @@ import projectConfig from '../project.config.json'
 
 // Main asynchronous function to initialize the application
 async function initializeApp() {
+
+	// Create botpilots watermark in console.
+	console.log("%cWebapp created by %cbot%cPilots: %chttps://botpilots.se", "font-weight: bold; font-size: 18px;", "color:rgb(159, 181, 255); font-style: italic; font-weight: bold; font-size: 18px;", "color:rgb(7, 20, 255); font-style: italic; font-weight: bold; font-size: 18px;", "color:rgb(0, 0, 0); font-style: italic; font-size: 18px;");
+
 	let activities: SummaryActivity[] = [];
 
 	// Validate and convert dates from strings to Date objects
