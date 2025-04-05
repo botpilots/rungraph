@@ -40,13 +40,7 @@ To enable this workflow, you need to add the following secrets to your GitHub re
 
 The workflow requires a long-lived `refresh_token` to operate. You need to perform the initial Strava OAuth2 authorization flow *once* manually to get this token.
 
-1.  **Prerequisites:**
-    *   Ensure you have created the `.secrets` file in the repository root with your `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET`.
-    *   Ensure the `.env` file exists in the repository root (it needs the `VITE_STRAVA_ACCESS_TOKEN=` line).
-    *   Install `jq` (a command-line JSON processor): `brew install jq` (macOS) or `sudo apt-get install jq` (Debian/Ubuntu).
-    *   Make the helper script executable: `chmod +x scripts/exchange_strava_code.sh`
-
-2.  **Authorization Flow:**
+1.  **Authorization:**
     *   Construct and visit an authorization URL like this in your browser (replace `YOUR_CLIENT_ID` and ensure `redirect_uri` matches your Strava app configuration - `http://localhost` is usually fine for this manual step):
       ```
       https://www.strava.com/oauth/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=http://localhost&response_type=code&approval_prompt=auto&scope=activity:read
@@ -54,58 +48,39 @@ The workflow requires a long-lived `refresh_token` to operate. You need to perfo
     *   Log in to Strava (if needed) and click "Authorize".
     *   Your browser will be redirected to your `redirect_uri` (e.g., `http://localhost/?state=&code=YOUR_CODE_HERE&scope=read,activity:read`). Copy the value of the `code` parameter from the URL in your browser's address bar.
 
-3.  **Exchange Code using Script:**
-    *   Run the helper script from your repository root in the terminal, passing the copied code as an argument:
+2.  **Exchange Code using Script:**
+    *  Run this curl with your values, AUTHORIZATIONCODE is the code you copied from the browser.
       ```bash
-      ./scripts/exchange_strava_code.sh COPIED_CODE_HERE
+        curl -X POST https://www.strava.com/oauth/token \
+        -F client_id=YOURCLIENTID \
+        -F client_secret=YOURCLIENTSECRET \
+        -F code=AUTHORIZATIONCODE \
+        -F grant_type=authorization_code
       ```
-      (Replace `COPIED_CODE_HERE` with the actual code).
-    *   The script will perform the token exchange with Strava, then automatically update `VITE_STRAVA_ACCESS_TOKEN` in your `.env` file and `STRAVA_REFRESH_TOKEN` in your `.secrets` file.
 
-4.  **Update GitHub Secret:**
-    *   Copy the new `refresh_token` value printed by the script (or from the updated `.secrets` file).
-    *   Go back to your GitHub repository secrets (`Settings` > `Secrets and variables` > `Actions`) and paste this value into the `STRAVA_REFRESH_TOKEN` secret.
+3.  **Update GitHub Secret:**
+    *   Copy the new `refresh_token` and `access_token` values sent back in the response.
+    *   Go back to your GitHub repository secrets (`Settings` > `Secrets and variables` > `Actions`) and paste these values into the `STRAVA_REFRESH_TOKEN` and `STRAVA_ACCESS_TOKEN` secrets.
 
 **Important Note on Refresh Token Lifespan:**
 Strava refresh tokens are long-lived and don't have a fixed expiration date like the 6-hour access tokens. However, a refresh token **will become invalid** if:
 *   A new refresh token is issued during a token refresh request (the GitHub Actions workflow *might* receive a new one but currently doesn't automatically update the secret).
 *   You manually revoke the application's access in your Strava settings.
 
-If the workflow starts failing with authorization errors, you may need to repeat the manual authorization flow using the helper script (Steps 2-4 above) to get a new valid refresh token and update the GitHub secret.
+If the workflow starts failing with authorization errors, you may need to repeat the manual authorization flow to get at new valid refresh token and update the GitHub secret.
 
 Once the secrets are configured correctly, the workflow will run automatically on its schedule or can be triggered manually.
 
-### Local Development and Testing (Workflow Simulation)
+## Data Fetching
 
-You can test the `fetch_strava_data.yml` workflow locally before committing changes using a tool like [`act`](https://github.com/nektos/act). This simulates how the workflow would run on GitHub Actions runners using Docker.
+This project fetches data from another repository `strava-data-fetcher` which uses a GitHub Actions workflow to fetch data from Strava and commit it to a `data/activities.json` file. For more information see that repository's README.
 
-1.  **Install `act`:** Follow the installation instructions on the [`act` repository](https://github.com/nektos/act#installation). You also need Docker installed and running.
-2.  **Ensure `.secrets` File is Ready:** Make sure your `.secrets` file exists in the repository root and contains valid `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, and `STRAVA_REFRESH_TOKEN` (you can populate the refresh token using the helper script described above).
-3.  **Run the Workflow:** Execute `act` from the root of your repository. To specifically run the fetch job and provide the secrets:
-    ```bash
-    act -j fetch --secret-file .secrets
-    ```
-    `act` will download the necessary Docker image and execute the steps. Check the output for success or errors. Note that `act` simulates the workflow run but does *not* perform the actual push to your GitHub repository.
-4.  **Limitations:** The local environment simulated by `act` might not be identical to the GitHub Actions environment. Always verify the final workflow behavior on GitHub Actions.
+## Deployment
 
-## Workflow Interaction: Data Fetching and Deployment
-
-This project utilizes two separate GitHub Actions workflows found in `.github/workflows/`:
-
-1.  **`fetch_strava_data.yml` (Data Fetching):**
-    *   **Trigger:** Runs on a schedule (e.g., every 6 hours) and can be manually triggered.
-    *   **Purpose:** Uses your Strava API credentials (via GitHub Secrets) to fetch recent activities.
-    *   **Output:** Commits the fetched activity data directly into the repository as `data/activities.json`. It also maintains a log (`data/fetch_log.txt`) and checksum file (`data/last_checksum.txt`).
-
-2.  **`deploy.yml` (Application Deployment):**
-    *   **Trigger:** Runs automatically whenever changes are pushed to the `main` branch.
+1.  **`deploy.yml`:**
+    *   **Trigger:** Runs automatically whenever changes are pushed to the `master` branch.
     *   **Purpose:** Builds the Vite/p5.js frontend application (`npm run build`) and deploys the resulting static files (from the `./dist` directory) to GitHub Pages.
-    *   **Data Usage:** When this workflow runs, it builds the application using the code and data files *currently present* in the `main` branch. This includes the `data/activities.json` file that was previously committed by the `fetch_strava_data.yml` workflow.
 
-**How they work together:**
-
-The data fetching workflow ensures the `data/activities.json` file in your repository is kept up-to-date with recent Strava activities. When you push code changes (or when the data fetch workflow pushes data updates) to the `main` branch, the deployment workflow rebuilds and redeploys your frontend application. The deployed application should be configured to simply read the static `data/activities.json` file included in its build, rather than making live calls to the Strava API itself.
-ð
 ## Configuration
 
 - The Vite configuration in `vite.config.js` includes the base path for GitHub Pages deployment (`/rungraph/`)

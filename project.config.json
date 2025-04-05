@@ -16,5 +16,5 @@
 		"blogUrl": "https://redshoesrunning.com/runner/",
 		"stravaId": 135151962
 	},
-	"fetchActivitiesUrl": "localMode"
+	"fetchActivitiesUrl": "https://botpilots.github.io/strava-data-fetcher/public/data/activities.json"
 }

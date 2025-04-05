@@ -43,8 +43,15 @@ async function initializeApp() {
 		console.log("Fetching activity data from configured URL...");
 		const fetchUrl = projectConfig.fetchActivitiesUrl;
 
-		// If the URL is a placeholder, fallback to local data
-		if (fetchUrl === "localMode") {
+		if (fetchUrl) {
+			// Use the configured URL
+			const response = await fetch(fetchUrl);
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status} while fetching ${fetchUrl}`);
+			}
+			activities = await response.json();
+		} else {
+			// Use local data as fallback
 			console.log("Using local activities data as fallback...");
 			const dataUrl = `${import.meta.env.BASE_URL}data/activities.json`;
 			console.log(`Attempting to fetch data from: ${dataUrl}`);
@@ -52,13 +59,6 @@ async function initializeApp() {
 			const response = await fetch(dataUrl);
 			if (!response.ok) {
 				throw new Error(`HTTP error! status: ${response.status} while fetching ${dataUrl}`);
-			}
-			activities = await response.json();
-		} else {
-			// Use the configured URL
-			const response = await fetch(fetchUrl);
-			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status} while fetching ${fetchUrl}`);
 			}
 			activities = await response.json();
 		}
